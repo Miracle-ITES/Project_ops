@@ -1,0 +1,64 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: pcc-postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: project_control_center
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d project_control_center"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7
+    container_name: pcc-redis
+    ports:
+      - "6380:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ../backend
+    container_name: pcc-backend
+    ports:
+      - "8001:8001"
+    env_file:
+      - ../backend/.env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8001 --reload
+    volumes:
+      - ../backend:/app
+
+  frontend:
+    build:
+      context: ../frontend
+    container_name: pcc-frontend
+    ports:
+      - "3001:3000"
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:8001
+    depends_on:
+      - backend
+    volumes:
+      - ../frontend:/app
+      - /app/node_modules
+      - /app/.next
+    command: npm run dev -- -p 3000
+
+volumes:
+  postgres_data:
