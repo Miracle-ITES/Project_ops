@@ -1,13 +1,29 @@
 import uuid
 from datetime import datetime, timezone
 
-import uuid
-
 from app.domain.user import RefreshToken, User
 from app.repositories.base import BaseRepository
 
 
 class UserRepository(BaseRepository):
+    def create(
+        self,
+        *,
+        email: str,
+        hashed_password: str,
+        full_name: str | None,
+        role_id: uuid.UUID,
+    ) -> User:
+        user = User(
+            email=email.lower(),
+            hashed_password=hashed_password,
+            full_name=full_name,
+            role_id=role_id,
+        )
+        self.db.add(user)
+        self.db.commit()
+        return user
+
     def get_by_email(self, email: str) -> User | None:
         return self.db.query(User).filter(User.email == email.lower()).first()
 

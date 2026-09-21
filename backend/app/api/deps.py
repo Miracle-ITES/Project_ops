@@ -102,7 +102,7 @@ async def get_current_user(
     users: UserRepository = Depends(get_user_repository),
 ) -> User:
     redis = await get_redis()
-    if redis.sismember("revoked_access_jti", token.jti):
+    if await redis.sismember("revoked_access_jti", token.jti):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Session revoked")
 
     user = users.get_by_id(token.user_id)
