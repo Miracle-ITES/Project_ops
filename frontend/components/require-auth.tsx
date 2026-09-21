@@ -6,10 +6,6 @@ import { useAuth } from "@/lib/auth-context";
 
 interface RequireAuthProps {
   children: ReactNode;
-  /** Optional permission code — if the user lacks it, they're redirected away
-   * rather than shown the page. This is a UX convenience only: the backend's
-   * require_permission(...) on the actual API routes is the real boundary,
-   * since anyone can bypass client-side checks via devtools. */
   permission?: string;
 }
 
