@@ -1,29 +1,17 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { useAuth } from "@/lib/auth-context";
 
 export default function Home() {
-  const [status, setStatus] = useState("Checking backend...");
+  const { user, isLoading } = useAuth();
+  const router = useRouter();
 
   useEffect(() => {
-    fetch(`${process.env.NEXT_PUBLIC_API_URL}/health`)
-      .then((res) => res.json())
-      .then((data) => setStatus(data.status))
-      .catch(() => setStatus("Backend unavailable"));
-  }, []);
+    if (isLoading) return;
+    router.replace(user ? "/dashboard" : "/login");
+  }, [isLoading, user, router]);
 
-  return (
-    <main className="flex min-h-screen items-center justify-center">
-      <div className="text-center">
-        <h1 className="text-3xl font-bold">
-          Project Control Center
-        </h1>
-
-        <p className="mt-4">
-          Backend status:{" "}
-          <span className="font-semibold">{status}</span>
-        </p>
-      </div>
-    </main>
-  );
+  return null;
 }
