@@ -9,6 +9,9 @@ from app.repositories.database import SessionLocal
 from app.domain.user import User
 from app.redis_client import get_redis
 from app.repositories.audit_repository import AuditLogRepository
+from app.repositories.project_repository import ProjectRepository
+from app.repositories.team_repository import TeamRepository
+from app.services.project_service import ProjectService
 from app.repositories.role_repository import RoleRepository
 from app.repositories.token_repository import RefreshTokenRepository
 from app.repositories.user_repository import UserRepository  # type: ignore[reportAttributeAccessIssue]
@@ -16,6 +19,8 @@ from app.services.auth_service import AuthService
 from app.services.permission_service import PermissionService
 from app.services.rate_limiter import LoginRateLimiter
 from app.services.security import TokenType, decode_token
+from app.services.team_service import TeamService
+from app.services.user_service import UserService
 
 bearer_scheme = HTTPBearer(auto_error=True)
 
@@ -48,6 +53,14 @@ def get_audit_repository(db: Session = Depends(get_db)) -> AuditLogRepository:
     return AuditLogRepository(db)
 
 
+def get_team_repository(db: Session = Depends(get_db)) -> TeamRepository:
+    return TeamRepository(db)
+
+
+def get_project_repository(db: Session = Depends(get_db)) -> ProjectRepository:
+    return ProjectRepository(db)
+
+
 # --- Services ---
 
 async def get_rate_limiter() -> LoginRateLimiter:
@@ -66,6 +79,27 @@ def get_auth_service(
 
 def get_permission_service(roles: RoleRepository = Depends(get_role_repository)) -> PermissionService:
     return PermissionService(roles)
+
+
+def get_team_service(
+    teams: TeamRepository = Depends(get_team_repository),
+    users: UserRepository = Depends(get_user_repository),
+) -> TeamService:
+    return TeamService(teams, users)
+
+
+def get_project_service(
+    projects: ProjectRepository = Depends(get_project_repository),
+    users: UserRepository = Depends(get_user_repository),
+) -> ProjectService:
+    return ProjectService(projects, users)
+
+
+def get_user_service(
+    users: UserRepository = Depends(get_user_repository),
+    roles: RoleRepository = Depends(get_role_repository),
+) -> UserService:
+    return UserService(users, roles)
 
 
 # --- Authentication ---

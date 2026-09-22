@@ -1,6 +1,6 @@
 # Project Ops
 
-AI-powered Team & Project Operations platform for managing projects, tasks, blockers, team progress, and AI-assisted workflows.
+AI-powered team and project operations platform for managing projects, team progress, blockers, and AI-assisted workflows.
 
 ## Tech Stack
 
@@ -8,9 +8,9 @@ AI-powered Team & Project Operations platform for managing projects, tasks, bloc
 - **Backend:** FastAPI, Python, SQLAlchemy, Alembic
 - **Database:** PostgreSQL 16
 - **Cache:** Redis 7
-- **Auth:** JWT (access + refresh), bcrypt password hashing, RBAC
-- **Infrastructure:** Docker, Docker Compose
-- **Testing:** Pytest
+- **Authentication:** JWT access and refresh tokens, bcrypt password hashing, RBAC
+- **Infrastructure:** Docker and Docker Compose
+- **Testing:** Pytest and the Phase 3/4 end-to-end smoke test
 
 ## Project Structure
 
@@ -20,19 +20,12 @@ project-control-center/
 ├── frontend/      # Next.js frontend
 ├── infra/         # Docker Compose configuration
 ├── .gitignore
-└── README.md
+└── readme.md
 ```
 
 ## Setup
 
-### 1. Clone the repository
-
-```bash
-git clone <repository-url>
-cd project-control-center
-```
-
-### 2. Configure environment variables
+### 1. Configure backend environment
 
 Create `backend/.env`:
 
@@ -40,9 +33,9 @@ Create `backend/.env`:
 DATABASE_URL=postgresql://postgres:postgres@localhost:5433/project_control_center
 REDIS_URL=redis://localhost:6380/0
 JWT_SECRET_KEY=<generate with: openssl rand -hex 32>
+JWT_ALGORITHM=HS256
 ACCESS_TOKEN_EXPIRE_MINUTES=15
 REFRESH_TOKEN_EXPIRE_DAYS=7
-
 ```
 
 Create `frontend/.env.local`:
@@ -51,39 +44,38 @@ Create `frontend/.env.local`:
 NEXT_PUBLIC_API_URL=http://localhost:8001
 ```
 
-### 3. Run with Docker
+### 2. Start the services
 
 ```bash
 docker compose -f infra/docker-compose.yml up --build
 ```
 
-### 4. Run database migrations and seed roles
+### 3. Apply migrations and seed roles
+
+From `backend/`:
 
 ```bash
-cd backend
 alembic upgrade head
 python -m app.seed_roles
 ```
 
+Create an initial administrator after seeding, using `backend/app/create_test_user.py`.
+
 ## Services
 
-| Service    | URL                        |
-| ---------- | -------------------------- |
-| Frontend   | http://localhost:3001      |
-| Backend    | http://localhost:8001      |
-| API Docs   | http://localhost:8001/docs |
-| PostgreSQL | localhost:5433             |
-| Redis      | localhost:6380             |
+| Service           | URL                        |
+| ----------------- | -------------------------- |
+| Frontend          | http://localhost:3001      |
+| Backend           | http://localhost:8001      |
+| API documentation | http://localhost:8001/docs |
+| PostgreSQL        | localhost:5433             |
+| Redis             | localhost:6380             |
 
 ## Health Check
-
-**Backend:**
 
 ```http
 GET /health
 ```
-
-**Response:**
 
 ```json
 {
@@ -91,25 +83,108 @@ GET /health
 }
 ```
 
-## Authentication & Roles
+## Authentication and RBAC
 
-| Endpoint        | Method | Description                           |
-| --------------- | ------ | ------------------------------------- |
-| `/auth/login`   | POST   | Exchange email/password for tokens    |
-| `/auth/refresh` | POST   | Rotate a refresh token for a new pair |
-| `/auth/logout`  | POST   | Revoke a refresh token                |
-| `/auth/me`      | GET    | Get the current authenticated user    |
+Authentication endpoints:
 
-Four built-in roles, seeded via `python -m app.seed_roles`:
+| Method | Endpoint        | Description                                 |
+| ------ | --------------- | ------------------------------------------- |
+| POST   | `/auth/login`   | Exchange email and password for tokens      |
+| POST   | `/auth/refresh` | Rotate a refresh token for a new token pair |
+| POST   | `/auth/logout`  | Revoke a refresh token                      |
+| GET    | `/auth/me`      | Get the current authenticated user          |
 
-| Role           | Primary Capabilities                                                                       | Restrictions                                                            |
-| -------------- | ------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------- |
-| Administrator  | Manage users, teams, projects, roles, settings, AI commands, exports, audit review         | Subject to application safeguards and audit logging                     |
-| Lead/Manager   | Create projects/tasks, assign work, review work, manage blockers, learning and KT          | Cannot change platform-level security settings unless granted           |
-| Member         | View assigned work, update status, submit daily updates, learning progress, raise blockers | Cannot reassign organization-wide ownership or edit restricted projects |
-| Viewer/Auditor | Read dashboards, projects, reports and permitted audit views                               | No mutation rights                                                      |
+The application uses granular permission codes through `require_permission`, rather than hardcoded role checks.
 
-Route-level access control uses granular permission codes (e.g. `projects:create`, `roles:manage`) rather than hardcoded role checks — see `backend/app/api/deps.py`.
+| Role           | Phase 3/4 capabilities                                                              |
+| -------------- | ----------------------------------------------------------------------------------- |
+| Administrator  | Manage users, teams, projects, roles, and all seeded permissions                    |
+| Lead/Manager   | Create and view projects, add milestones and contributors, and manage assigned work |
+| Member         | View assigned work and project data where permitted; cannot create projects         |
+| Viewer/Auditor | Read-only dashboard, project, report, and audit access                              |
+
+Roles and permissions are defined in `backend/app/seed_roles.py`. The seed command is safe to rerun and preserves manually granted permissions.
+
+## Phase 3: Users and Teams
+
+Phase 3 adds administrator-managed users, teams, memberships, and roster views. These routes require `users:manage` or `teams:manage`.
+
+### Users
+
+| Method | Endpoint                  | Description                                                      |
+| ------ | ------------------------- | ---------------------------------------------------------------- |
+| POST   | `/users`                  | Create a user with email, password, optional full name, and role |
+| GET    | `/users`                  | List users and their roles and permissions                       |
+| GET    | `/users/{user_id}`        | Get one user                                                     |
+| PATCH  | `/users/{user_id}/role`   | Change a user's role                                             |
+| PATCH  | `/users/{user_id}/active` | Activate or deactivate a user                                    |
+
+Example request:
+
+```json
+{
+  "email": "lead@example.com",
+  "password": "testpassword123",
+  "role_name": "Lead/Manager"
+}
+```
+
+### Teams
+
+| Method | Endpoint                             | Description                     |
+| ------ | ------------------------------------ | ------------------------------- |
+| POST   | `/teams`                             | Create a team                   |
+| GET    | `/teams`                             | List teams                      |
+| POST   | `/teams/{team_id}/members`           | Add a user to a team            |
+| DELETE | `/teams/{team_id}/members/{user_id}` | Remove a user from a team       |
+| GET    | `/teams/{team_id}/roster`            | View the team and member roster |
+
+Team membership is stored in `team_memberships` and enforces one membership per team/user pair.
+
+## Phase 4: Projects
+
+Phase 4 adds projects, contributors, and milestones. Project priorities are `low`, `medium`, `high`, or `critical`. Project maturity values are `planning`, `active`, `at_risk`, `blocked`, or `completed`.
+
+| Method | Endpoint                              | Permission        | Description                                         |
+| ------ | ------------------------------------- | ----------------- | --------------------------------------------------- |
+| POST   | `/projects`                           | `projects:create` | Create a project; `owner_id` defaults to the caller |
+| GET    | `/projects`                           | `projects:view`   | List projects                                       |
+| GET    | `/projects/{project_id}`              | `projects:view`   | Get project details, contributors, and milestones   |
+| PATCH  | `/projects/{project_id}`              | `projects:create` | Update project metadata                             |
+| POST   | `/projects/{project_id}/contributors` | `projects:create` | Add a contributor                                   |
+| POST   | `/projects/{project_id}/milestones`   | `projects:create` | Add a milestone                                     |
+
+Example project request:
+
+```json
+{
+  "name": "Platform rollout",
+  "description": "Coordinate the next release",
+  "priority": "high",
+  "maturity": "planning"
+}
+```
+
+The Phase 4 database migration creates `teams`, `team_memberships`, `projects`, `project_contributors`, and `milestones`, plus the PostgreSQL enum types used by project priority, maturity, and milestone status.
+
+## Verification
+
+Start the backend, then run the Phase 3/4 smoke test from `backend/` with an existing Administrator account:
+
+```bash
+uvicorn app.main:app --reload --port 8001
+python verify_phase3_4.py admin@example.com adminpassword
+```
+
+The script verifies:
+
+- Administrator login
+- Administrator user creation and user listing
+- Non-administrator user-creation denial
+- Team creation, membership, and roster retrieval
+- Lead/Manager project creation and listing
+- Project detail retrieval and milestone creation
+- Member project-creation denial
 
 ## Testing
 
@@ -125,26 +200,45 @@ cd backend
 alembic upgrade head
 ```
 
-## Status
+Current migration chain:
 
-### Phase 1 — Initial Setup Complete
+```text
+279344241f97_initial
+└── 0002_auth_rbac
+    └── 0003_teams_projects
+```
 
-- [x] Frontend setup
-- [x] Backend setup
-- [x] Docker Compose
-- [x] PostgreSQL & Redis infrastructure
-- [x] Database configuration
-- [x] Alembic setup
-- [x] API health check
-- [x] Frontend–Backend connection
+## Implementation Status
 
-### Phase 2 — Authentication & RBAC Complete
+### Phase 1: Initial Setup
 
-- [x] `users` / `roles` / `permissions` tables (+ `refresh_tokens`, `audit_logs`)
-- [x] JWT login/refresh/logout with token rotation and revocation
+- [x] Frontend and backend setup
+- [x] Docker Compose infrastructure
+- [x] PostgreSQL and Redis configuration
+- [x] Alembic setup and health check
+- [x] Frontend-to-backend connection
+
+### Phase 2: Authentication and RBAC
+
+- [x] Users, roles, permissions, refresh tokens, and audit logs
+- [x] JWT login, refresh, logout, rotation, and revocation
 - [x] Bcrypt password hashing
-- [x] Redis-backed login rate limiting / lockout
-- [x] Permission middleware (`require_permission`) protecting routes
-- [x] Role/permission seed script (Administrator, Lead/Manager, Member, Viewer/Auditor)
-- [x] Audit logging for login attempts and permission denials
-      More project modules will be added in upcoming phases.
+- [x] Redis-backed login rate limiting and lockout
+- [x] Permission middleware and audit logging
+- [x] Seeded Administrator, Lead/Manager, Member, and Viewer/Auditor roles
+
+### Phase 3: Users and Teams
+
+- [x] Administrator user management
+- [x] Team creation and listing
+- [x] Team membership management
+- [x] Team roster retrieval
+
+### Phase 4: Projects
+
+- [x] Project creation, listing, and detail retrieval
+- [x] Project metadata updates
+- [x] Project contributors
+- [x] Project milestones
+- [x] PostgreSQL enum persistence aligned with API values
+- [x] End-to-end smoke test passing

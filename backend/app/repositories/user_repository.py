@@ -1,19 +1,29 @@
 import uuid
-from datetime import datetime, timezone
 
-from app.domain.user import RefreshToken, User
+from sqlalchemy.orm import joinedload
+
+from app.domain.user import User
 from app.repositories.base import BaseRepository
 
 
 class UserRepository(BaseRepository):
-    def create(
-        self,
-        *,
-        email: str,
-        hashed_password: str,
-        full_name: str | None,
-        role_id: uuid.UUID,
-    ) -> User:
+    def get_by_id(self, user_id: uuid.UUID) -> User | None:
+        return (
+            self.db.query(User)
+            .options(joinedload(User.role))
+            .filter(User.id == user_id)
+            .first()
+        )
+
+    def get_by_email(self, email: str) -> User | None:
+        return (
+            self.db.query(User)
+            .options(joinedload(User.role))
+            .filter(User.email == email.lower())
+            .first()
+        )
+
+    def create(self, *, email: str, hashed_password: str, full_name: str | None, role_id: uuid.UUID) -> User:
         user = User(
             email=email.lower(),
             hashed_password=hashed_password,
@@ -22,44 +32,20 @@ class UserRepository(BaseRepository):
         )
         self.db.add(user)
         self.db.commit()
+        self.db.refresh(user)
         return user
 
-    def get_by_email(self, email: str) -> User | None:
-        return self.db.query(User).filter(User.email == email.lower()).first()
+    def list_all(self) -> list[User]:
+        return self.db.query(User).options(joinedload(User.role)).order_by(User.email).all()
 
-    def get_by_id(self, user_id: uuid.UUID) -> User | None:
-        return self.db.query(User).filter(User.id == user_id).first()
-
-
-class RefreshTokenRepository(BaseRepository):
-    def create(self, *, user_id: uuid.UUID, token_hash: str, expires_at: datetime,
-               user_agent: str | None, ip_address: str | None) -> RefreshToken:
-        record = RefreshToken(
-            user_id=user_id,
-            token_hash=token_hash,
-            expires_at=expires_at,
-            user_agent=user_agent,
-            ip_address=ip_address,
-        )
-        self.db.add(record)
+    def update_role(self, user: User, role_id: uuid.UUID) -> User:
+        user.role_id = role_id
         self.db.commit()
-        return record
+        self.db.refresh(user)
+        return user
 
-    def get_valid_by_hash(self, token_hash: str) -> RefreshToken | None:
-        record = self.db.query(RefreshToken).filter(RefreshToken.token_hash == token_hash).first()
-        if record is None:
-            return None
-        if record.revoked:
-            return None
-        if record.expires_at.replace(tzinfo=timezone.utc) < datetime.now(timezone.utc):
-            return None
-        return record
-
-    def get_by_hash(self, token_hash: str) -> RefreshToken | None:
-        """Unlike get_valid_by_hash, returns even revoked/expired rows —
-        used by logout, which should succeed idempotently either way."""
-        return self.db.query(RefreshToken).filter(RefreshToken.token_hash == token_hash).first()
-
-    def revoke(self, record: RefreshToken) -> None:
-        record.revoked = True
+    def set_active(self, user: User, is_active: bool) -> User:
+        user.is_active = is_active
         self.db.commit()
+        self.db.refresh(user)
+        return user
