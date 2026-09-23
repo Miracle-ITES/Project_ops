@@ -1,8 +1,9 @@
 import uuid
 from datetime import date
 
-from app.domain.project import Milestone, MilestoneStatus, Project, ProjectContributor, ProjectMaturity, ProjectPriority
+from app.domain.project import Milestone, MilestoneStatus, Project, ProjectContributor, ProjectMaturity, ProjectPriority, ProjectTeam
 from app.repositories.project_repository import ProjectRepository
+from app.repositories.team_repository import TeamRepository
 from app.repositories.user_repository import UserRepository
 
 
@@ -13,9 +14,10 @@ class ProjectError(Exception):
 
 
 class ProjectService:
-    def __init__(self, projects: ProjectRepository, users: UserRepository):
+    def __init__(self, projects: ProjectRepository, users: UserRepository, teams: TeamRepository):
         self.projects = projects
         self.users = users
+        self.teams = teams
 
     def create_project(
         self, *, name: str, description: str | None, owner_id: uuid.UUID,
@@ -60,3 +62,16 @@ class ProjectService:
     ) -> Milestone:
         self.get_project(project_id)  # 404s if missing
         return self.projects.add_milestone(project_id, name=name, due_date=due_date, status=status)
+
+    def add_team(self, project_id: uuid.UUID, team_id: uuid.UUID) -> ProjectTeam:
+        self.get_project(project_id)
+        if self.teams.get_by_id(team_id) is None:
+            raise ProjectError("Team not found")
+        if self.projects.is_team_assigned(project_id, team_id):
+            raise ProjectError("Team is already assigned to this project")
+        return self.projects.add_team(project_id, team_id)
+
+    def remove_team(self, project_id: uuid.UUID, team_id: uuid.UUID) -> None:
+        self.get_project(project_id)
+        if not self.projects.remove_team(project_id, team_id):
+            raise ProjectError("Team is not assigned to this project")

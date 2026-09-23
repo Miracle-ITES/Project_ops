@@ -69,6 +69,16 @@ class ContributorOut(BaseModel):
     full_name: str | None
 
 
+class ProjectTeamOut(BaseModel):
+    team_id: uuid.UUID
+    name: str
+    description: str | None
+
+
+class ProjectTeamAddRequest(BaseModel):
+    team_id: uuid.UUID
+
+
 class ProjectDetailOut(BaseModel):
     id: uuid.UUID
     name: str
@@ -77,6 +87,7 @@ class ProjectDetailOut(BaseModel):
     maturity: ProjectMaturity
     owner: OwnerOut
     contributors: list[ContributorOut]
+    teams: list[ProjectTeamOut]
     milestones: list[MilestoneOut]
     created_at: datetime
     updated_at: datetime

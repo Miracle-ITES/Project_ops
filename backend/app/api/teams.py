@@ -2,7 +2,7 @@ import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, status
 
-from app.api.deps import get_team_service, require_permission
+from app.api.deps import get_team_service, require_any_permission, require_permission
 from app.api.schemas.teams import RosterMemberOut, TeamCreateRequest, TeamMemberAddRequest, TeamOut, TeamRosterOut
 from app.domain.user import User
 from app.services.team_service import TeamError, TeamService
@@ -29,6 +29,14 @@ def list_teams(
     # what's Administrator-gated, per your Phase 3 spec ("Admin can create
     # a team, add members, and view a team roster").
     _: User = Depends(require_permission("teams:manage")),
+):
+    return team_service.list_teams()
+
+
+@router.get("/assignable", response_model=list[TeamOut])
+def list_assignable_teams(
+    team_service: TeamService = Depends(get_team_service),
+    _: User = Depends(require_any_permission("teams:manage", "project_teams:manage")),
 ):
     return team_service.list_teams()
 

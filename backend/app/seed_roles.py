@@ -21,6 +21,7 @@ ALL_PERMISSIONS = {
     "exports:manage": "Export data out of the platform",
     "audit:review": "Review and act on audit logs",
     "projects:create": "Create new projects/tasks",
+    "project_teams:manage": "Assign teams to projects",
     "tasks:assign": "Assign work to team members",
     "work:review": "Review submitted work",
     "blockers:manage": "Manage/resolve reported blockers",
@@ -53,6 +54,7 @@ ROLE_DEFINITIONS = {
         ),
         "permissions": {
             "projects:create", "tasks:assign", "work:review", "blockers:manage",
+            "project_teams:manage",
             "learning_kt:manage", "work:view_assigned", "status:update",
             "daily_updates:submit", "dashboards:view", "projects:view", "reports:view",
         },

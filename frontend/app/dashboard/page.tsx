@@ -1,205 +1,192 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { RequireAuth } from "@/components/require-auth";
+import { AppShell } from "@/components/app-shell";
 import { useAuth } from "@/lib/auth-context";
+import { listProjects } from "@/lib/projects-api";
+import type { ProjectListItemOut, ProjectMaturity } from "@/types/projects";
 
-const projects = [
-  { name: "Project Ops Platform", progress: 72, health: "Healthy" },
-  { name: "Authentication Module", progress: 48, health: "At Risk" },
-  { name: "AI Assistant", progress: 25, health: "Blocked" },
-];
-
-const tasks = [
-  { title: "Complete dashboard UI", status: "In Progress" },
-  { title: "Connect project API", status: "To Do" },
-  { title: "Fix authentication flow", status: "Completed" },
-];
+const HEALTH_BADGE: Record<ProjectMaturity, { text: string; dot: string; className: string }> = {
+  planning: { text: "Planning", dot: "bg-outline", className: "bg-surface-container-high text-on-surface-variant" },
+  active: { text: "Healthy", dot: "bg-secondary", className: "bg-secondary-container/60 text-on-secondary-container" },
+  at_risk: { text: "At Risk", dot: "bg-amber-600", className: "bg-amber-100 text-amber-900" },
+  blocked: { text: "Blocked", dot: "bg-error", className: "bg-error-container text-on-error-container" },
+  completed: { text: "Completed", dot: "bg-secondary", className: "bg-secondary-container/60 text-on-secondary-container" },
+};
 
 function DashboardContent() {
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
+  const [projects, setProjects] = useState<ProjectListItemOut[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    listProjects()
+      .then(setProjects)
+      .finally(() => setIsLoading(false));
+  }, []);
+
+  const firstName = (user?.full_name || user?.email || "").split(/[\s@]/)[0];
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="border-b bg-white px-8 py-4">
-        <div className="mx-auto flex max-w-7xl items-center">
-          {/* Brand */}
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-[#34d399]/20 bg-[#033729] shadow-sm">
-              <span className="text-lg font-bold text-emerald-300">
-                PO
-              </span>
-            </div>
-
-            
-          </div>
-
-          {/* Greeting */}
-          <div className="ml-8">
-            <h1 className="text-xl font-semibold text-gray-900">
-              Good morning
+    <AppShell active="dashboard" breadcrumb="Executive Overview">
+      <div className="px-gutter-lg py-space-lg">
+        {/* Header row */}
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-space-md mb-space-lg">
+          <div>
+            <h1 className="font-headline-xl text-headline-xl text-on-surface font-bold tracking-tight">
+              Good morning{firstName ? `, ${firstName}` : ""}
             </h1>
-            <p className="text-sm text-gray-500">
+            <p className="font-body-md text-body-md text-on-surface-variant mt-0.5">
               Here&apos;s an overview of your team&apos;s work.
             </p>
           </div>
-
-          {/* Sign out */}
-          <button
-            onClick={() => logout()}
-            className="ml-auto rounded-lg border border-gray-200 bg-[#033729] px-4 py-2 text-sm font-medium text-emerald-300 transition hover:border-red-200 hover:bg-red-50 hover:text-red-600"
-          >
-            Sign out
-          </button>
         </div>
-      </header>
-      <main className="mx-auto max-w-7xl space-y-6 p-8">
-        {/* User */}
-        <div>
-          <p className="text-sm text-gray-500">
-            Signed in as{" "}
-            <span className="font-medium text-gray-900">
-              {user?.email}
+
+        {/* KPI cards — Active Projects is real; the rest have no backend
+            yet (Tasks, Blockers, Team Progress) so they stay static. */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-space-md mb-space-lg">
+          <div className="p-4 rounded-xl bg-surface-container-lowest shadow-sm">
+            <span className="font-label-sm text-label-sm uppercase tracking-wider font-semibold text-outline">
+              Active Projects
             </span>
-          </p>
+            <div className="mt-3 font-display-lg text-display-lg font-bold text-on-surface tracking-tight">
+              {isLoading ? "…" : projects.length}
+            </div>
+          </div>
+          <div className="p-4 rounded-xl bg-surface-container-lowest shadow-sm">
+            <span className="font-label-sm text-label-sm uppercase tracking-wider font-semibold text-outline">
+              Tasks Due Today
+            </span>
+            <div className="mt-3 font-display-lg text-display-lg font-bold text-on-surface tracking-tight">34</div>
+            <p className="mt-3 font-body-sm text-body-sm text-on-surface-variant">Placeholder — no Tasks module yet</p>
+          </div>
+          <div className="p-4 rounded-xl bg-surface-container-lowest shadow-sm">
+            <span className="font-label-sm text-label-sm uppercase tracking-wider font-semibold text-outline">
+              Open Blockers
+            </span>
+            <div className="mt-3 font-display-lg text-display-lg font-bold text-error tracking-tight">4</div>
+            <p className="mt-3 font-body-sm text-body-sm text-on-surface-variant">Placeholder — no Blockers module yet</p>
+          </div>
+          <div className="p-4 rounded-xl bg-surface-container-lowest shadow-sm">
+            <span className="font-label-sm text-label-sm uppercase tracking-wider font-semibold text-outline">
+              Team Progress
+            </span>
+            <div className="mt-3 font-display-lg text-display-lg font-bold text-secondary tracking-tight">86%</div>
+            <p className="mt-3 font-body-sm text-body-sm text-on-surface-variant">Placeholder — no progress metric yet</p>
+          </div>
         </div>
 
-        {/* KPI Cards */}
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <div className="rounded-xl bg-white p-5 shadow-sm">
-            <p className="text-sm text-gray-500">Active Projects</p>
-            <p className="mt-2 text-3xl font-semibold text-gray-900">4</p>
-          </div>
-
-          <div className="rounded-xl bg-white p-5 shadow-sm">
-            <p className="text-sm text-gray-500">Tasks Due</p>
-            <p className="mt-2 text-3xl font-semibold text-gray-900">12</p>
-          </div>
-
-          <div className="rounded-xl bg-white p-5 shadow-sm">
-            <p className="text-sm text-gray-500">Open Blockers</p>
-            <p className="mt-2 text-3xl font-semibold text-red-600">2</p>
-          </div>
-
-          <div className="rounded-xl bg-white p-5 shadow-sm">
-            <p className="text-sm text-gray-500">Team Progress</p>
-            <p className="mt-2 text-3xl font-semibold text-emerald-600">
-              72%
-            </p>
-          </div>
-        </div>
-
-        {/* Projects + Tasks */}
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-          {/* Project Health */}
-          <section className="rounded-xl bg-white p-6 shadow-sm">
-            <div className="mb-5">
-              <h2 className="text-lg font-semibold text-gray-900">
-                Project Health
-              </h2>
-              <p className="text-sm text-gray-500">
-                Current project progress
-              </p>
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-space-lg items-start">
+          <div className="lg:col-span-8 flex flex-col gap-space-lg">
+            {/* Project Health — real data */}
+            <div className="p-space-md rounded-xl bg-surface-container-lowest shadow-sm">
+              <div className="pb-space-md">
+                <h2 className="font-headline-md text-headline-md font-bold text-on-surface">Project Health</h2>
+                <p className="font-body-sm text-body-sm text-on-surface-variant">
+                  Live from your Projects data
+                </p>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-left font-body-md text-body-md">
+                  <thead>
+                    <tr className="text-outline font-label-sm text-label-sm uppercase tracking-wider bg-surface-container-low/50">
+                      <th className="py-2.5 px-3 rounded-l-md">Project</th>
+                      <th className="py-2.5 px-3">Owner</th>
+                      <th className="py-2.5 px-3">Priority</th>
+                      <th className="py-2.5 px-3 rounded-r-md">Health</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {isLoading ? (
+                      <tr>
+                        <td colSpan={4} className="py-6 px-3 text-on-surface-variant">
+                          Loading...
+                        </td>
+                      </tr>
+                    ) : projects.length === 0 ? (
+                      <tr>
+                        <td colSpan={4} className="py-6 px-3 text-on-surface-variant">
+                          No projects yet.
+                        </td>
+                      </tr>
+                    ) : (
+                      projects.slice(0, 6).map((p) => {
+                        const badge = HEALTH_BADGE[p.maturity];
+                        return (
+                          <tr key={p.id} className="hover:bg-surface-container-low/60 transition-colors">
+                            <td className="py-3 px-3 font-title-sm text-title-sm font-semibold text-on-surface">
+                              {p.name}
+                            </td>
+                            <td className="py-3 px-3 whitespace-nowrap text-on-surface font-medium">
+                              {p.owner.full_name || p.owner.email}
+                            </td>
+                            <td className="py-3 px-3 whitespace-nowrap capitalize text-on-surface-variant">
+                              {p.priority}
+                            </td>
+                            <td className="py-3 px-3 whitespace-nowrap">
+                              <span
+                                className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full font-label-sm text-label-sm font-semibold ${badge.className}`}
+                              >
+                                <span className={`w-1.5 h-1.5 rounded-full ${badge.dot}`} />
+                                {badge.text}
+                              </span>
+                            </td>
+                          </tr>
+                        );
+                      })
+                    )}
+                  </tbody>
+                </table>
+              </div>
             </div>
 
-            <div className="space-y-5">
-              {projects.map((project) => (
-                <div key={project.name}>
-                  <div className="mb-2 flex items-center justify-between">
-                    <span className="text-sm font-medium text-gray-900">
-                      {project.name}
-                    </span>
-
-                    <span
-                      className={`text-xs font-medium ${project.health === "Healthy"
-                          ? "text-emerald-600"
-                          : project.health === "At Risk"
-                            ? "text-amber-600"
-                            : "text-red-600"
-                        }`}
-                    >
-                      {project.health}
-                    </span>
+            {/* Task Overview — static, no Tasks backend yet */}
+            <div className="p-space-md rounded-xl bg-surface-container-lowest shadow-sm">
+              <div className="pb-space-md flex items-center gap-space-sm">
+                <h2 className="font-headline-md text-headline-md font-bold text-on-surface">Task Overview</h2>
+                <span className="px-2 py-0.5 rounded-md bg-surface-container-low text-on-surface-variant font-code-sm text-code-sm">
+                  Static preview — no Tasks module yet
+                </span>
+              </div>
+              <div className="space-y-3">
+                {[
+                  { title: "Complete dashboard UI", status: "In Progress" },
+                  { title: "Connect project API", status: "To Do" },
+                  { title: "Fix authentication flow", status: "Completed" },
+                ].map((task) => (
+                  <div
+                    key={task.title}
+                    className="flex items-center justify-between rounded-lg bg-surface-container-low/60 p-4"
+                  >
+                    <span className="text-sm font-medium text-on-surface">{task.title}</span>
+                    <span className="text-xs text-on-surface-variant">{task.status}</span>
                   </div>
+                ))}
+              </div>
+            </div>
+          </div>
 
-                  <div className="h-2 rounded-full bg-gray-100">
-                    <div
-                      className="h-2 rounded-full bg-emerald-500"
-                      style={{ width: `${project.progress}%` }}
-                    />
-                  </div>
-
-                  <p className="mt-1 text-xs text-gray-400">
-                    {project.progress}% complete
-                  </p>
+          <div className="lg:col-span-4 flex flex-col gap-space-lg">
+            {/* Active Blockers — static, no Blockers backend yet */}
+            <div className="p-space-md rounded-xl bg-surface-container-lowest shadow-sm">
+              <div className="pb-space-sm flex items-center gap-2">
+                <h2 className="font-headline-md text-headline-md font-bold text-on-surface">Active Blockers</h2>
+                <span className="px-2 py-0.5 rounded-md bg-surface-container-low text-on-surface-variant font-code-sm text-code-sm">
+                  Static preview
+                </span>
+              </div>
+              <div className="space-y-space-sm mt-1">
+                <div className="p-3 rounded-lg bg-error-container/40">
+                  <p className="text-sm font-medium text-on-error-container">Authentication API integration</p>
+                  <p className="mt-1 text-xs text-on-error-container/80">Waiting for backend endpoint</p>
                 </div>
-              ))}
+              </div>
             </div>
-          </section>
-
-          {/* Task Overview */}
-          <section className="rounded-xl bg-white p-6 shadow-sm">
-            <div className="mb-5">
-              <h2 className="text-lg font-semibold text-gray-900">
-                Task Overview
-              </h2>
-              <p className="text-sm text-gray-500">
-                Recent tasks across your projects
-              </p>
-            </div>
-
-            <div className="space-y-3">
-              {tasks.map((task) => (
-                <div
-                  key={task.title}
-                  className="flex items-center justify-between rounded-lg bg-gray-50 p-4"
-                >
-                  <span className="text-sm font-medium text-gray-800">
-                    {task.title}
-                  </span>
-
-                  <span className="text-xs text-gray-500">
-                    {task.status}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </section>
+          </div>
         </div>
-
-        {/* Blockers */}
-        <section className="rounded-xl bg-white p-6 shadow-sm">
-          <div className="mb-4">
-            <h2 className="text-lg font-semibold text-gray-900">
-              Active Blockers
-            </h2>
-            <p className="text-sm text-gray-500">
-              Issues that need attention
-            </p>
-          </div>
-
-          <div className="space-y-3">
-            <div className="rounded-lg border border-red-100 bg-red-50 p-4">
-              <p className="text-sm font-medium text-red-800">
-                Authentication API integration
-              </p>
-              <p className="mt-1 text-xs text-red-600">
-                Waiting for backend endpoint
-              </p>
-            </div>
-
-            <div className="rounded-lg border border-amber-100 bg-amber-50 p-4">
-              <p className="text-sm font-medium text-amber-800">
-                AI Assistant setup
-              </p>
-              <p className="mt-1 text-xs text-amber-600">
-                LLM configuration pending
-              </p>
-            </div>
-          </div>
-        </section>
-      </main>
-    </div>
+      </div>
+    </AppShell>
   );
 }
 

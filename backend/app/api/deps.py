@@ -91,8 +91,9 @@ def get_team_service(
 def get_project_service(
     projects: ProjectRepository = Depends(get_project_repository),
     users: UserRepository = Depends(get_user_repository),
+    teams: TeamRepository = Depends(get_team_repository),
 ) -> ProjectService:
-    return ProjectService(projects, users)
+    return ProjectService(projects, users, teams)
 
 
 def get_user_service(
@@ -183,5 +184,38 @@ def require_permission(permission_code: str, revalidate_from_db: bool = False):
                 detail="You do not have permission to perform this action",
             )
         return user
+
+    return dependency
+
+
+def require_any_permission(*permission_codes: str):
+    """Allow a route when the caller has at least one listed permission."""
+
+    async def dependency(
+        request: Request,
+        user: User = Depends(get_current_user),
+        permission_service: PermissionService = Depends(get_permission_service),
+        audit: AuditLogRepository = Depends(get_audit_repository),
+    ) -> User:
+        if any(
+            permission_service.has_permission(
+                user,
+                permission_code,
+                from_token=getattr(user, "_token_permissions", []),
+            )
+            for permission_code in permission_codes
+        ):
+            return user
+
+        audit.record(
+            user_id=user.id,
+            action="permission_denied",
+            detail=f"Missing any of {permission_codes} for {request.method} {request.url.path}",
+            ip_address=request.client.host if request.client else None,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You do not have permission to perform this action",
+        )
 
     return dependency

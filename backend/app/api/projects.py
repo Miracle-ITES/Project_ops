@@ -10,6 +10,8 @@ from app.api.schemas.projects import (
     MilestoneOut,
     ProjectCreateRequest,
     ProjectDetailOut,
+    ProjectTeamAddRequest,
+    ProjectTeamOut,
     ProjectListItemOut,
     ProjectUpdateRequest,
 )
@@ -28,6 +30,10 @@ def _to_detail(project: Project) -> ProjectDetailOut:
         contributors=[
             ContributorOut(user_id=c.user.id, email=c.user.email, full_name=c.user.full_name)
             for c in project.contributors
+        ],
+        teams=[
+            ProjectTeamOut(team_id=pt.team.id, name=pt.team.name, description=pt.team.description)
+            for pt in project.teams
         ],
         milestones=[MilestoneOut.model_validate(m) for m in project.milestones],
         created_at=project.created_at, updated_at=project.updated_at,
@@ -117,3 +123,33 @@ def add_milestone(
         return _to_detail(project_service.get_project(project_id))
     except ProjectError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=exc.message)
+
+
+@router.post("/{project_id}/teams", response_model=ProjectDetailOut, status_code=status.HTTP_201_CREATED)
+def add_team(
+    project_id: uuid.UUID,
+    payload: ProjectTeamAddRequest,
+    project_service: ProjectService = Depends(get_project_service),
+    _: User = Depends(require_permission("project_teams:manage")),
+):
+    try:
+        project_service.add_team(project_id, payload.team_id)
+        return _to_detail(project_service.get_project(project_id))
+    except ProjectError as exc:
+        code = status.HTTP_404_NOT_FOUND if "not found" in exc.message.lower() else status.HTTP_400_BAD_REQUEST
+        raise HTTPException(status_code=code, detail=exc.message)
+
+
+@router.delete("/{project_id}/teams/{team_id}", status_code=status.HTTP_204_NO_CONTENT)
+def remove_team(
+    project_id: uuid.UUID,
+    team_id: uuid.UUID,
+    project_service: ProjectService = Depends(get_project_service),
+    _: User = Depends(require_permission("project_teams:manage")),
+):
+    try:
+        project_service.remove_team(project_id, team_id)
+    except ProjectError as exc:
+        code = status.HTTP_404_NOT_FOUND if "not found" in exc.message.lower() else status.HTTP_400_BAD_REQUEST
+        raise HTTPException(status_code=code, detail=exc.message)
+    return None

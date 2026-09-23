@@ -71,6 +71,21 @@ Create an initial administrator after seeding, using `backend/app/create_test_us
 | PostgreSQL        | localhost:5433             |
 | Redis             | localhost:6380             |
 
+## Frontend Pages
+
+The frontend currently includes:
+
+| Route                    | Description                                                  |
+| ------------------------ | ------------------------------------------------------------ |
+| `/login`                 | Sign in and restore a session                                |
+| `/dashboard`             | Project health and operational overview                      |
+| `/users`                 | Administrator user provisioning and access management        |
+| `/users/{user_id}`       | User details and role permissions                            |
+| `/teams`                 | Team creation and team directory                             |
+| `/teams/{team_id}`       | Team roster and member assignment                            |
+| `/projects`              | Project directory and project creation                       |
+| `/projects/{project_id}` | Project details, team/contributor assignment, and milestones |
+
 ## Health Check
 
 ```http
@@ -115,6 +130,7 @@ Phase 3 adds administrator-managed users, teams, memberships, and roster views. 
 | ------ | ------------------------- | ---------------------------------------------------------------- |
 | POST   | `/users`                  | Create a user with email, password, optional full name, and role |
 | GET    | `/users`                  | List users and their roles and permissions                       |
+| GET    | `/users/assignable`       | List users assignable to teams or projects                       |
 | GET    | `/users/{user_id}`        | Get one user                                                     |
 | PATCH  | `/users/{user_id}/role`   | Change a user's role                                             |
 | PATCH  | `/users/{user_id}/active` | Activate or deactivate a user                                    |
@@ -131,28 +147,33 @@ Example request:
 
 ### Teams
 
-| Method | Endpoint                             | Description                     |
-| ------ | ------------------------------------ | ------------------------------- |
-| POST   | `/teams`                             | Create a team                   |
-| GET    | `/teams`                             | List teams                      |
-| POST   | `/teams/{team_id}/members`           | Add a user to a team            |
-| DELETE | `/teams/{team_id}/members/{user_id}` | Remove a user from a team       |
-| GET    | `/teams/{team_id}/roster`            | View the team and member roster |
+| Method | Endpoint                             | Description                       |
+| ------ | ------------------------------------ | --------------------------------- |
+| POST   | `/teams`                             | Create a team                     |
+| GET    | `/teams`                             | List teams                        |
+| GET    | `/teams/assignable`                  | List teams assignable to projects |
+| POST   | `/teams/{team_id}/members`           | Add a user to a team              |
+| DELETE | `/teams/{team_id}/members/{user_id}` | Remove a user from a team         |
+| GET    | `/teams/{team_id}/roster`            | View the team and member roster   |
 
 Team membership is stored in `team_memberships` and enforces one membership per team/user pair.
 
 ## Phase 4: Projects
 
-Phase 4 adds projects, contributors, and milestones. Project priorities are `low`, `medium`, `high`, or `critical`. Project maturity values are `planning`, `active`, `at_risk`, `blocked`, or `completed`.
+Phase 4 adds projects, contributors, milestones, and project-team assignment. Project priorities are `low`, `medium`, `high`, or `critical`. Project maturity values are `planning`, `active`, `at_risk`, `blocked`, or `completed`.
 
-| Method | Endpoint                              | Permission        | Description                                         |
-| ------ | ------------------------------------- | ----------------- | --------------------------------------------------- |
-| POST   | `/projects`                           | `projects:create` | Create a project; `owner_id` defaults to the caller |
-| GET    | `/projects`                           | `projects:view`   | List projects                                       |
-| GET    | `/projects/{project_id}`              | `projects:view`   | Get project details, contributors, and milestones   |
-| PATCH  | `/projects/{project_id}`              | `projects:create` | Update project metadata                             |
-| POST   | `/projects/{project_id}/contributors` | `projects:create` | Add a contributor                                   |
-| POST   | `/projects/{project_id}/milestones`   | `projects:create` | Add a milestone                                     |
+| Method | Endpoint                                 | Permission             | Description                                         |
+| ------ | ---------------------------------------- | ---------------------- | --------------------------------------------------- |
+| POST   | `/projects`                              | `projects:create`      | Create a project; `owner_id` defaults to the caller |
+| GET    | `/projects`                              | `projects:view`        | List projects                                       |
+| GET    | `/projects/{project_id}`                 | `projects:view`        | Get project details, contributors, and milestones   |
+| PATCH  | `/projects/{project_id}`                 | `projects:create`      | Update project metadata                             |
+| POST   | `/projects/{project_id}/contributors`    | `projects:create`      | Add a contributor                                   |
+| POST   | `/projects/{project_id}/milestones`      | `projects:create`      | Add a milestone                                     |
+| POST   | `/projects/{project_id}/teams`           | `project_teams:manage` | Assign a team to a project                          |
+| DELETE | `/projects/{project_id}/teams/{team_id}` | `project_teams:manage` | Remove a team from a project                        |
+
+The `project_teams:manage` permission is granted only to Administrator and Lead/Manager roles. Project team assignments are stored in `project_teams` and enforce one assignment per project/team pair.
 
 Example project request:
 
@@ -165,7 +186,7 @@ Example project request:
 }
 ```
 
-The Phase 4 database migration creates `teams`, `team_memberships`, `projects`, `project_contributors`, and `milestones`, plus the PostgreSQL enum types used by project priority, maturity, and milestone status.
+The Phase 4 database migrations create `teams`, `team_memberships`, `projects`, `project_contributors`, `milestones`, and `project_teams`, plus the PostgreSQL enum types used by project priority, maturity, and milestone status.
 
 ## Verification
 
@@ -205,7 +226,8 @@ Current migration chain:
 ```text
 279344241f97_initial
 └── 0002_auth_rbac
-    └── 0003_teams_projects
+  └── 0003_teams_projects
+    └── 0004_project_teams
 ```
 
 ## Implementation Status
@@ -233,6 +255,7 @@ Current migration chain:
 - [x] Team creation and listing
 - [x] Team membership management
 - [x] Team roster retrieval
+- [x] Frontend user administration and team roster pages
 
 ### Phase 4: Projects
 
@@ -240,5 +263,6 @@ Current migration chain:
 - [x] Project metadata updates
 - [x] Project contributors
 - [x] Project milestones
+- [x] Project team assignment restricted to Administrator and Lead/Manager
 - [x] PostgreSQL enum persistence aligned with API values
 - [x] End-to-end smoke test passing

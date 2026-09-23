@@ -2,7 +2,7 @@ import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, status
 
-from app.api.deps import get_current_user, get_user_service, require_permission
+from app.api.deps import get_current_user, get_user_service, require_any_permission, require_permission
 from app.api.schemas.users import UserActiveChangeRequest, UserCreateRequest, UserListItemOut, UserRoleChangeRequest
 from app.domain.user import User
 from app.services.user_service import UserService, UserServiceError
@@ -36,6 +36,14 @@ def create_user(
 def list_users(
     user_service: UserService = Depends(get_user_service),
     _: User = Depends(require_permission("users:manage")),
+):
+    return [_to_out(u) for u in user_service.list_users()]
+
+
+@router.get("/assignable", response_model=list[UserListItemOut])
+def list_assignable_users(
+    user_service: UserService = Depends(get_user_service),
+    _: User = Depends(require_any_permission("users:manage", "teams:manage", "projects:create")),
 ):
     return [_to_out(u) for u in user_service.list_users()]
 

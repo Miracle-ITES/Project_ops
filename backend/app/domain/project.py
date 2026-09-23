@@ -68,6 +68,9 @@ class Project(Base):
     contributors: Mapped[list["ProjectContributor"]] = relationship(
         back_populates="project", cascade="all, delete-orphan"
     )
+    teams: Mapped[list["ProjectTeam"]] = relationship(
+        back_populates="project", cascade="all, delete-orphan"
+    )
     milestones: Mapped[list["Milestone"]] = relationship(
         back_populates="project", cascade="all, delete-orphan", order_by="Milestone.due_date"
     )
@@ -90,6 +93,25 @@ class ProjectContributor(Base):
 
     project: Mapped["Project"] = relationship(back_populates="contributors")
     user: Mapped["User"] = relationship()
+
+
+class ProjectTeam(Base):
+    """Join row connecting a project to the teams working on it."""
+
+    __tablename__ = "project_teams"
+    __table_args__ = (UniqueConstraint("project_id", "team_id", name="uq_project_team"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    project_id: Mapped[uuid.UUID] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("projects.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    team_id: Mapped[uuid.UUID] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("teams.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    added_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+
+    project: Mapped["Project"] = relationship(back_populates="teams")
+    team: Mapped["Team"] = relationship()
 
 
 class Milestone(Base):
