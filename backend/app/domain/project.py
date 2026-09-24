@@ -31,6 +31,11 @@ class MilestoneStatus(str, enum.Enum):
     COMPLETED = "completed"
 
 
+class BlockerStatus(str, enum.Enum):
+    OPEN = "open"
+    RESOLVED = "resolved"
+
+
 class Project(Base):
     __tablename__ = "projects"
 
@@ -73,6 +78,9 @@ class Project(Base):
     )
     milestones: Mapped[list["Milestone"]] = relationship(
         back_populates="project", cascade="all, delete-orphan", order_by="Milestone.due_date"
+    )
+    blockers: Mapped[list["Blocker"]] = relationship(
+        back_populates="project", cascade="all, delete-orphan", order_by="Blocker.created_at.desc()"
     )
 
 
@@ -135,3 +143,27 @@ class Milestone(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
 
     project: Mapped["Project"] = relationship(back_populates="milestones")
+
+
+class Blocker(Base):
+    __tablename__ = "blockers"
+
+    id: Mapped[uuid.UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    project_id: Mapped[uuid.UUID] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("projects.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    title: Mapped[str] = mapped_column(String(200), nullable=False)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    status: Mapped[BlockerStatus] = mapped_column(
+        Enum(BlockerStatus, name="blocker_status", values_callable=lambda enum_type: [member.value for member in enum_type]),
+        default=BlockerStatus.OPEN,
+        nullable=False,
+    )
+    raised_by_id: Mapped[uuid.UUID] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("users.id"), nullable=False, index=True
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+    resolved_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+    project: Mapped["Project"] = relationship(back_populates="blockers")
+    raised_by: Mapped["User"] = relationship()

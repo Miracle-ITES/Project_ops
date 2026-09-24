@@ -3,8 +3,11 @@
 import Link from "next/link";
 import { Activity, CheckSquare, FolderOpen, LayoutDashboard, Sparkles, UsersRound, TriangleAlert, ChevronRight, UserCog } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
+import { updateMyProfile } from "@/lib/users-api";
+import { ApiError } from "@/lib/api-client";
+import { useState, type FormEvent } from "react";
 
-export type NavKey = "dashboard" | "projects" | "team" | "users";
+export type NavKey = "dashboard" | "projects" | "team" | "users" | "blockers" | "activity";
 
 const NAV_ITEMS: { key: NavKey | "disabled"; label: string; icon: typeof LayoutDashboard; href?: string; permission?: string }[] = [
   { key: "dashboard", label: "Dashboard", icon: LayoutDashboard, href: "/dashboard" },
@@ -12,8 +15,8 @@ const NAV_ITEMS: { key: NavKey | "disabled"; label: string; icon: typeof LayoutD
   { key: "disabled", label: "Tasks", icon: CheckSquare },
   { key: "team", label: "Team", icon: UsersRound, href: "/teams" },
   { key: "users", label: "Users", icon: UserCog, href: "/users", permission: "users:manage" },
-  { key: "disabled", label: "Blockers", icon: TriangleAlert },
-  { key: "disabled", label: "Activity", icon: Activity },
+  { key: "blockers", label: "Blockers", icon: TriangleAlert, href: "/blockers", permission: "projects:view" },
+  { key: "activity", label: "Activity", icon: Activity, href: "/activity", permission: "audit:view" },
   { key: "disabled", label: "AI Assistant", icon: Sparkles },
 ];
 
@@ -24,8 +27,55 @@ interface AppShellProps {
 }
 
 export function AppShell({ active, breadcrumb, children }: AppShellProps) {
-  const { user, logout, hasPermission } = useAuth();
+  const { user, logout, refreshUser, hasPermission } = useAuth();
+  const [profileName, setProfileName] = useState(user?.full_name || "");
+  const [companyName, setCompanyName] = useState(user?.company_name || "");
+  const [jobTitle, setJobTitle] = useState(user?.job_title || "");
+  const [department, setDepartment] = useState(user?.department || "");
+  const [phoneNumber, setPhoneNumber] = useState(user?.phone_number || "");
+  const [location, setLocation] = useState(user?.location || "");
+  const [profileError, setProfileError] = useState<string | null>(null);
+  const [profileSaving, setProfileSaving] = useState(false);
   const initials = (user?.full_name || user?.email || "?").slice(0, 2).toUpperCase();
+
+  async function completeProfile(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setProfileError(null);
+    setProfileSaving(true);
+    try {
+      await updateMyProfile({
+        full_name: profileName, company_name: companyName, job_title: jobTitle,
+        department, phone_number: phoneNumber, location,
+      });
+      await refreshUser();
+    } catch (err) {
+      setProfileError(err instanceof ApiError ? err.message : "Could not save profile.");
+    } finally {
+      setProfileSaving(false);
+    }
+  }
+
+  if (user && !user.profile_completed) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-surface px-6">
+        <form onSubmit={completeProfile} className="w-full max-w-md rounded-xl bg-surface-container-lowest p-8 shadow-sm">
+          <p className="font-label-sm text-label-sm font-semibold uppercase tracking-wider text-secondary">Welcome to Project Ops</p>
+          <h1 className="mt-2 font-headline-xl text-headline-xl font-bold text-on-surface">Complete your profile</h1>
+          <p className="mt-2 font-body-md text-body-md text-on-surface-variant">Complete your company profile. These details are locked after submission and can only be changed by an administrator.</p>
+          {profileError && <p className="mt-4 rounded-lg bg-error-container px-3 py-2 text-sm text-on-error-container">{profileError}</p>}
+          <div className="mt-6 grid gap-3 sm:grid-cols-2">
+            <input required minLength={1} value={profileName} onChange={(event) => setProfileName(event.target.value)} placeholder="Full name" className="w-full rounded-lg border border-outline-variant px-3 py-2 text-sm focus:border-secondary focus:outline-none" />
+            <input required value={companyName} onChange={(event) => setCompanyName(event.target.value)} placeholder="Company name" className="w-full rounded-lg border border-outline-variant px-3 py-2 text-sm focus:border-secondary focus:outline-none" />
+            <input required value={jobTitle} onChange={(event) => setJobTitle(event.target.value)} placeholder="Job title" className="w-full rounded-lg border border-outline-variant px-3 py-2 text-sm focus:border-secondary focus:outline-none" />
+            <input value={department} onChange={(event) => setDepartment(event.target.value)} placeholder="Department" className="w-full rounded-lg border border-outline-variant px-3 py-2 text-sm focus:border-secondary focus:outline-none" />
+            <input value={phoneNumber} onChange={(event) => setPhoneNumber(event.target.value)} placeholder="Phone number" className="w-full rounded-lg border border-outline-variant px-3 py-2 text-sm focus:border-secondary focus:outline-none" />
+            <input value={location} onChange={(event) => setLocation(event.target.value)} placeholder="Location" className="w-full rounded-lg border border-outline-variant px-3 py-2 text-sm focus:border-secondary focus:outline-none" />
+          </div>
+          <button type="submit" disabled={profileSaving} className="mt-4 w-full rounded-lg bg-primary px-4 py-2 text-sm font-medium text-on-primary disabled:opacity-50">{profileSaving ? "Saving..." : "Save profile"}</button>
+        </form>
+      </main>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-surface">
@@ -64,9 +114,7 @@ export function AppShell({ active, breadcrumb, children }: AppShellProps) {
                 : "flex items-center gap-space-sm px-space-sm py-2 rounded-lg text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors";
 
               if (!item.href) {
-                // Nav items with no backend yet (Tasks, Blockers, Activity,
-                // AI Assistant) — present for visual parity with the
-                // design, but not wired to anything real.
+                // Tasks and AI Assistant are present until their backend flows are added.
                 return (
                   <span
                     key={item.label}
@@ -95,14 +143,14 @@ export function AppShell({ active, breadcrumb, children }: AppShellProps) {
               <div className="w-8 h-8 rounded-full bg-primary-container text-on-primary flex items-center justify-center font-label-sm text-[11px] font-bold shrink-0">
                 {initials}
               </div>
-              <div className="flex flex-col min-w-0">
+              <Link href="/profile" className="flex flex-col min-w-0 hover:text-secondary">
                 <span className="font-label-md text-label-md font-semibold text-on-surface truncate leading-tight">
                   {user?.full_name || user?.email}
                 </span>
                 <span className="font-body-sm text-[11px] text-on-surface-variant truncate">
                   {user?.role.name}
                 </span>
-              </div>
+              </Link>
             </div>
             <button
               onClick={() => logout()}

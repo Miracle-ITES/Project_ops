@@ -75,7 +75,7 @@ class AuthService:
         # the same error either way.
         password_ok = verify_password(password, user.hashed_password if user else DUMMY_HASH)
 
-        if not user or not password_ok or not user.is_active:
+        if not user or not password_ok:
             try:
                 await self.rate_limiter.record_attempt(identifier, success=False)
             except RateLimitExceeded:
@@ -84,6 +84,11 @@ class AuthService:
             finally:
                 self.audit.record(user_id=user.id if user else None, action="login_failed", ip_address=ip_address)
             raise AuthError()
+
+        if not user.is_active:
+            await self.rate_limiter.record_attempt(identifier, success=False)
+            self.audit.record(user_id=user.id, action="login_denied_inactive", ip_address=ip_address)
+            raise AuthError("Access denied by administrator")
 
         await self.rate_limiter.record_attempt(identifier, success=True)
         self.audit.record(user_id=user.id, action="login_success", ip_address=ip_address)

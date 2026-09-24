@@ -1,4 +1,5 @@
 import uuid
+from datetime import datetime
 
 from sqlalchemy.orm import joinedload
 
@@ -23,12 +24,16 @@ class UserRepository(BaseRepository):
             .first()
         )
 
-    def create(self, *, email: str, hashed_password: str, full_name: str | None, role_id: uuid.UUID) -> User:
+    def create(
+        self, *, email: str, hashed_password: str, full_name: str | None, role_id: uuid.UUID,
+        profile_completed: bool = True,
+    ) -> User:
         user = User(
             email=email.lower(),
             hashed_password=hashed_password,
             full_name=full_name,
             role_id=role_id,
+            profile_completed=profile_completed,
         )
         self.db.add(user)
         self.db.commit()
@@ -46,6 +51,28 @@ class UserRepository(BaseRepository):
 
     def set_active(self, user: User, is_active: bool) -> User:
         user.is_active = is_active
+        self.db.commit()
+        self.db.refresh(user)
+        return user
+
+    def update_profile(
+        self, user: User, *, full_name: str, company_name: str | None = None,
+        job_title: str | None = None, department: str | None = None,
+        phone_number: str | None = None, location: str | None = None,
+    ) -> User:
+        user.full_name = full_name
+        user.company_name = company_name
+        user.job_title = job_title
+        user.department = department
+        user.phone_number = phone_number
+        user.location = location
+        user.profile_completed = True
+        self.db.commit()
+        self.db.refresh(user)
+        return user
+
+    def mark_invitation_sent(self, user: User) -> User:
+        user.invitation_sent_at = datetime.utcnow()
         self.db.commit()
         self.db.refresh(user)
         return user

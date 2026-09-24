@@ -37,6 +37,12 @@ class UserOut(BaseModel):
     email: EmailStr
     full_name: str | None
     is_active: bool
+    profile_completed: bool
+    company_name: str | None
+    job_title: str | None
+    department: str | None
+    phone_number: str | None
+    location: str | None
     role: RoleOut
 
     class Config:

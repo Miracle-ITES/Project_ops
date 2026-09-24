@@ -9,6 +9,7 @@ from app.repositories.database import SessionLocal
 from app.domain.user import User
 from app.redis_client import get_redis
 from app.repositories.audit_repository import AuditLogRepository
+from app.repositories.blocker_repository import BlockerRepository
 from app.repositories.project_repository import ProjectRepository
 from app.repositories.team_repository import TeamRepository
 from app.services.project_service import ProjectService
@@ -16,6 +17,7 @@ from app.repositories.role_repository import RoleRepository
 from app.repositories.token_repository import RefreshTokenRepository
 from app.repositories.user_repository import UserRepository  # type: ignore[reportAttributeAccessIssue]
 from app.services.auth_service import AuthService
+from app.services.blocker_service import BlockerService
 from app.services.permission_service import PermissionService
 from app.services.rate_limiter import LoginRateLimiter
 from app.services.security import TokenType, decode_token
@@ -61,6 +63,10 @@ def get_project_repository(db: Session = Depends(get_db)) -> ProjectRepository:
     return ProjectRepository(db)
 
 
+def get_blocker_repository(db: Session = Depends(get_db)) -> BlockerRepository:
+    return BlockerRepository(db)
+
+
 # --- Services ---
 
 async def get_rate_limiter() -> LoginRateLimiter:
@@ -94,6 +100,13 @@ def get_project_service(
     teams: TeamRepository = Depends(get_team_repository),
 ) -> ProjectService:
     return ProjectService(projects, users, teams)
+
+
+def get_blocker_service(
+    blockers: BlockerRepository = Depends(get_blocker_repository),
+    projects: ProjectRepository = Depends(get_project_repository),
+) -> BlockerService:
+    return BlockerService(blockers, projects)
 
 
 def get_user_service(

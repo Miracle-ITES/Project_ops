@@ -36,6 +36,15 @@ JWT_SECRET_KEY=<generate with: openssl rand -hex 32>
 JWT_ALGORITHM=HS256
 ACCESS_TOKEN_EXPIRE_MINUTES=15
 REFRESH_TOKEN_EXPIRE_DAYS=7
+ENVIRONMENT=development
+
+# Required for administrator email invitations
+SMTP_HOST=smtp.your-provider.com
+SMTP_PORT=587
+SMTP_USERNAME=notifications@your-domain.com
+SMTP_PASSWORD=<smtp-password>
+SMTP_FROM=notifications@your-domain.com
+SMTP_USE_TLS=true
 ```
 
 Create `frontend/.env.local`:
@@ -80,11 +89,14 @@ The frontend currently includes:
 | `/login`                 | Sign in and restore a session                                |
 | `/dashboard`             | Project health and operational overview                      |
 | `/users`                 | Administrator user provisioning and access management        |
-| `/users/{user_id}`       | User details and role permissions                            |
-| `/teams`                 | Team creation and team directory                             |
-| `/teams/{team_id}`       | Team roster and member assignment                            |
+| `/users/{user_id}`       | User profile and administrator access management             |
+| `/profile`               | Signed-in user's company profile                             |
+| `/teams`                 | Team directory; Leads can view, Administrators can manage    |
+| `/teams/{team_id}`       | Team roster; membership changes are Administrator-only       |
 | `/projects`              | Project directory and project creation                       |
 | `/projects/{project_id}` | Project details, team/contributor assignment, and milestones |
+| `/blockers`              | Raise and resolve project blockers                           |
+| `/activity`              | Recent authentication and administrative activity            |
 
 ## Health Check
 
@@ -109,41 +121,46 @@ Authentication endpoints:
 | POST   | `/auth/logout`  | Revoke a refresh token                      |
 | GET    | `/auth/me`      | Get the current authenticated user          |
 
+Inactive users with valid credentials receive `Access denied by administrator`. Incorrect credentials continue to use the generic login error.
+
 The application uses granular permission codes through `require_permission`, rather than hardcoded role checks.
 
-| Role           | Phase 3/4 capabilities                                                              |
-| -------------- | ----------------------------------------------------------------------------------- |
-| Administrator  | Manage users, teams, projects, roles, and all seeded permissions                    |
-| Lead/Manager   | Create and view projects, add milestones and contributors, and manage assigned work |
-| Member         | View assigned work and project data where permitted; cannot create projects         |
-| Viewer/Auditor | Read-only dashboard, project, report, and audit access                              |
+| Role           | Phase 3/4 capabilities                                                                           |
+| -------------- | ------------------------------------------------------------------------------------------------ |
+| Administrator  | Manage users, teams, projects, roles, and all seeded permissions                                 |
+| Lead/Manager   | View teams and rosters, assign project teams, create and view projects, and manage assigned work |
+| Member         | View assigned work and project data where permitted; cannot create projects                      |
+| Viewer/Auditor | Read-only dashboard, project, report, and audit access                                           |
 
 Roles and permissions are defined in `backend/app/seed_roles.py`. The seed command is safe to rerun and preserves manually granted permissions.
 
 ## Phase 3: Users and Teams
 
-Phase 3 adds administrator-managed users, teams, memberships, and roster views. These routes require `users:manage` or `teams:manage`.
+Phase 3 adds administrator-managed users, teams, memberships, and roster views. Team browsing is available to users with `projects:view`, `project_teams:manage`, or `teams:manage`; membership mutations remain administrator-only through `teams:manage`.
 
 ### Users
 
-| Method | Endpoint                  | Description                                                      |
-| ------ | ------------------------- | ---------------------------------------------------------------- |
-| POST   | `/users`                  | Create a user with email, password, optional full name, and role |
-| GET    | `/users`                  | List users and their roles and permissions                       |
-| GET    | `/users/assignable`       | List users assignable to teams or projects                       |
-| GET    | `/users/{user_id}`        | Get one user                                                     |
-| PATCH  | `/users/{user_id}/role`   | Change a user's role                                             |
-| PATCH  | `/users/{user_id}/active` | Activate or deactivate a user                                    |
+| Method | Endpoint                   | Description                                                     |
+| ------ | -------------------------- | --------------------------------------------------------------- |
+| POST   | `/users`                   | Administrator-only email invitation with role and optional name |
+| GET    | `/users`                   | List users and their roles and permissions                      |
+| GET    | `/users/assignable`        | List users assignable to teams or projects                      |
+| GET    | `/users/{user_id}`         | Get one user                                                    |
+| PATCH  | `/users/me/profile`        | Complete the signed-in user's first-login profile               |
+| PATCH  | `/users/{user_id}/profile` | Administrator updates any user's profile                        |
+| PATCH  | `/users/{user_id}/role`    | Change a user's role                                            |
+| PATCH  | `/users/{user_id}/active`  | Activate or deactivate a user                                   |
 
 Example request:
 
 ```json
 {
   "email": "lead@example.com",
-  "password": "testpassword123",
   "role_name": "Lead/Manager"
 }
 ```
+
+The backend generates a temporary password and sends it to the invited email address. SMTP must be configured for invitations to succeed. Invited users must complete their company profile on first login; after submission, users cannot edit their own profile and only Administrators can change it.
 
 ### Teams
 
@@ -175,6 +192,17 @@ Phase 4 adds projects, contributors, milestones, and project-team assignment. Pr
 
 The `project_teams:manage` permission is granted only to Administrator and Lead/Manager roles. Project team assignments are stored in `project_teams` and enforce one assignment per project/team pair.
 
+## Blockers and Activity
+
+Blockers are linked to projects and can be raised by users with `blockers:raise`. Users with `blockers:manage` can mark blockers as resolved. Blocker creation and status changes are written to the audit activity feed.
+
+| Method | Endpoint                        | Permission        | Description                 |
+| ------ | ------------------------------- | ----------------- | --------------------------- |
+| GET    | `/blockers`                     | `projects:view`   | List project blockers       |
+| POST   | `/blockers`                     | `blockers:raise`  | Raise a project blocker     |
+| PATCH  | `/blockers/{blocker_id}/status` | `blockers:manage` | Resolve or reopen a blocker |
+| GET    | `/activity`                     | `audit:view`      | List recent audit activity  |
+
 Example project request:
 
 ```json
@@ -190,22 +218,20 @@ The Phase 4 database migrations create `teams`, `team_memberships`, `projects`, 
 
 ## Verification
 
-Start the backend, then run the Phase 3/4 smoke test from `backend/` with an existing Administrator account:
+Run the backend tests from the repository root:
 
 ```bash
-uvicorn app.main:app --reload --port 8001
-python verify_phase3_4.py admin@example.com adminpassword
+pytest backend/tests
 ```
 
-The script verifies:
+For a local UI smoke test:
 
-- Administrator login
-- Administrator user creation and user listing
-- Non-administrator user-creation denial
-- Team creation, membership, and roster retrieval
-- Lead/Manager project creation and listing
-- Project detail retrieval and milestone creation
-- Member project-creation denial
+1. Log in as an Administrator.
+2. Invite a user from `/users` and verify the email delivery.
+3. Sign in as the invited user and complete the company profile.
+4. Verify the profile is visible at `/profile` and editable only by the Administrator.
+5. Verify Leads can browse `/teams` and assign teams on project details.
+6. Raise a blocker and confirm it appears in `/activity`.
 
 ## Testing
 
@@ -228,6 +254,8 @@ Current migration chain:
 └── 0002_auth_rbac
   └── 0003_teams_projects
     └── 0004_project_teams
+      └── 0005_invitations_blockers
+        └── 0006_user_company_profile
 ```
 
 ## Implementation Status
@@ -256,6 +284,9 @@ Current migration chain:
 - [x] Team membership management
 - [x] Team roster retrieval
 - [x] Frontend user administration and team roster pages
+- [x] Administrator email invitations with generated temporary passwords
+- [x] First-login company profile completion and administrator-only edits
+- [x] Lead read-only team and roster access
 
 ### Phase 4: Projects
 
@@ -266,3 +297,10 @@ Current migration chain:
 - [x] Project team assignment restricted to Administrator and Lead/Manager
 - [x] PostgreSQL enum persistence aligned with API values
 - [x] End-to-end smoke test passing
+
+### Operational Workflows
+
+- [x] Project blockers and resolution workflow
+- [x] Activity feed for authentication, invitations, and blocker events
+- [x] Inactive-account administrator denial message
+- [x] Responsive personal and administrator profile sections

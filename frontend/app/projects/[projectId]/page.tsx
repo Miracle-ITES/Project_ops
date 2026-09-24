@@ -40,17 +40,21 @@ function ProjectDetailContent() {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const load = useCallback(async () => {
-    const requests: [Promise<ProjectDetailOut>, Promise<UserListItemOut[]>] = [
-      getProject(projectId),
-      canManage ? listAssignableUsers() : Promise.resolve([]),
-    ];
-    const [projectData, usersData, teamsData] = await Promise.all([
-      ...requests,
-      canManageTeams ? listAssignableTeams() : Promise.resolve([]),
-    ]);
-    setProject(projectData);
-    setAllUsers(usersData);
-    setAllTeams(teamsData);
+    try {
+      const requests: [Promise<ProjectDetailOut>, Promise<UserListItemOut[]>] = [
+        getProject(projectId),
+        canManage ? listAssignableUsers() : Promise.resolve([]),
+      ];
+      const [projectData, usersData, teamsData] = await Promise.all([
+        ...requests,
+        canManageTeams ? listAssignableTeams() : Promise.resolve([]),
+      ]);
+      setProject(projectData);
+      setAllUsers(usersData);
+      setAllTeams(teamsData);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Failed to load project.");
+    }
   }, [canManage, canManageTeams, projectId]);
 
   useEffect(() => {
@@ -128,8 +132,12 @@ function ProjectDetailContent() {
 
   if (!project) {
     return (
-      <AppShell active="projects" breadcrumb="Loading...">
-        <p className="p-8 text-sm text-on-surface-variant">Loading...</p>
+      <AppShell active="projects" breadcrumb={error ? "Unable to load project" : "Loading..."}>
+        {error ? (
+          <p className="m-8 rounded-lg bg-error-container px-3 py-2 text-sm text-on-error-container">{error}</p>
+        ) : (
+          <p className="p-8 text-sm text-on-surface-variant">Loading...</p>
+        )}
       </AppShell>
     );
   }

@@ -10,6 +10,7 @@ import { listAssignableUsers } from "@/lib/users-api";
 import { ApiError } from "@/lib/api-client";
 import type { TeamRosterOut } from "@/types/teams";
 import type { UserListItemOut } from "@/types/users";
+import { useAuth } from "@/lib/auth-context";
 
 function initials(name: string) {
   return name
@@ -22,6 +23,8 @@ function initials(name: string) {
 
 function RosterContent() {
   const { teamId } = useParams<{ teamId: string }>();
+  const { hasPermission } = useAuth();
+  const canManageTeams = hasPermission("teams:manage");
   const [roster, setRoster] = useState<TeamRosterOut | null>(null);
   const [allUsers, setAllUsers] = useState<UserListItemOut[]>([]);
   const [selectedUserId, setSelectedUserId] = useState("");
@@ -29,10 +32,13 @@ function RosterContent() {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const load = useCallback(async () => {
-    const [rosterData, usersData] = await Promise.all([getRoster(teamId), listAssignableUsers()]);
+    const [rosterData, usersData] = await Promise.all([
+      getRoster(teamId),
+      canManageTeams ? listAssignableUsers() : Promise.resolve([]),
+    ]);
     setRoster(rosterData);
     setAllUsers(usersData);
-  }, [teamId]);
+  }, [canManageTeams, teamId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -101,7 +107,7 @@ function RosterContent() {
 
         {error && <p className="mb-4 rounded-lg bg-error-container px-3 py-2 text-sm text-on-error-container">{error}</p>}
 
-        <form onSubmit={handleAdd} className="mb-6 flex gap-2 rounded-xl bg-surface-container-lowest p-4 shadow-sm">
+        {canManageTeams && <form onSubmit={handleAdd} className="mb-6 flex gap-2 rounded-xl bg-surface-container-lowest p-4 shadow-sm">
           <label htmlFor="team-member" className="sr-only">Assign member to team</label>
           <select
             id="team-member"
@@ -123,7 +129,7 @@ function RosterContent() {
           >
             Add
           </button>
-        </form>
+        </form>}
 
         {roster.members.length === 0 ? (
           <p className="font-body-md text-body-md text-on-surface-variant">No members yet.</p>
@@ -143,12 +149,12 @@ function RosterContent() {
                       <p className="font-body-sm text-body-sm text-on-surface-variant truncate">{member.email}</p>
                     </div>
                   </div>
-                  <button
+                  {canManageTeams && <button
                     onClick={() => handleRemove(member.user_id)}
                     className="font-label-sm text-label-sm text-error hover:underline shrink-0"
                   >
                     Remove
-                  </button>
+                  </button>}
                 </div>
                 <div className="mt-3 flex items-center gap-2">
                   <span className="px-2 py-0.5 rounded-md bg-surface-container-low text-on-surface-variant font-label-sm text-label-sm font-semibold">
@@ -169,7 +175,7 @@ function RosterContent() {
 
 export default function TeamRosterPage() {
   return (
-    <RequireAuth permission="teams:manage">
+    <RequireAuth permission="projects:view">
       <RosterContent />
     </RequireAuth>
   );

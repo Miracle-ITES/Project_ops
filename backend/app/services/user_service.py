@@ -1,9 +1,12 @@
 import uuid
+import secrets
+import string
 
 from app.domain.user import User
 from app.repositories.role_repository import RoleRepository
 from app.repositories.user_repository import UserRepository
 from app.services.security import hash_password
+from app.services.email_service import send_invitation_email
 
 
 class UserServiceError(Exception):
@@ -23,15 +26,36 @@ class UserService:
         self.users = users
         self.roles = roles
 
-    def create_user(self, *, email: str, password: str, full_name: str | None, role_name: str) -> User:
+    def invite_user(self, *, email: str, full_name: str | None, role_name: str) -> User:
         if self.users.get_by_email(email):
             raise UserServiceError(f"A user with email '{email}' already exists")
         role = self.roles.get_by_name(role_name)
         if role is None:
             raise UserServiceError(f"Role '{role_name}' does not exist")
-        return self.users.create(
-            email=email, hashed_password=hash_password(password), full_name=full_name, role_id=role.id,
+        temporary_password = "".join(secrets.choice(string.ascii_letters + string.digits + "!@#$%") for _ in range(16))
+        user = self.users.create(
+            email=email, hashed_password=hash_password(temporary_password), full_name=full_name,
+            role_id=role.id, profile_completed=False,
         )
+        try:
+            send_invitation_email(recipient=user.email, temporary_password=temporary_password, role_name=role.name)
+        except Exception:
+            self.users.set_active(user, False)
+            raise UserServiceError("User was created but the invitation email could not be sent")
+        return self.users.mark_invitation_sent(user)
+
+    def update_profile(self, user: User, *, full_name: str, company_name: str | None = None,
+                       job_title: str | None = None, department: str | None = None,
+                       phone_number: str | None = None, location: str | None = None) -> User:
+        if user.profile_completed:
+            raise UserServiceError("Profile details are locked and can only be changed by an administrator")
+        return self.users.update_profile(
+            user, full_name=full_name, company_name=company_name, job_title=job_title,
+            department=department, phone_number=phone_number, location=location,
+        )
+
+    def admin_update_profile(self, user_id: uuid.UUID, **profile_fields: str | None) -> User:
+        return self.users.update_profile(self.get_user(user_id), **profile_fields)
 
     def list_users(self) -> list[User]:
         return self.users.list_all()

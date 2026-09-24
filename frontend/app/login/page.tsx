@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 
 import { useAuth } from "@/lib/auth-context";
 import { ApiError } from "@/lib/api-client";
+import { Eye, EyeOff } from 'lucide-react';
 
 export default function LoginPage() {
   const { login } = useAuth();
@@ -33,8 +34,10 @@ export default function LoginPage() {
         setError(
           "Too many failed attempts. Please wait a few minutes and try again."
         );
+      } else if (err instanceof ApiError) {
+        setError(err.message);
       } else {
-        setError("Incorrect email or password.");
+        setError("Unable to sign in. Please try again.");
       }
     } finally {
       setIsSubmitting(false);
@@ -98,7 +101,7 @@ export default function LoginPage() {
 
           <div className="relative z-10 my-8 space-y-8">
 
-           
+
 
             {/* Heading */}
             <h1 className="max-w-xl text-2xl font-bold leading-[1.15] tracking-tight sm:text-4xl lg:text-[38px]">
@@ -186,7 +189,7 @@ export default function LoginPage() {
 
               </div>
 
-              
+
 
               {/* Bottom AI line */}
               <div className="flex items-center justify-between border-t border-emerald-500/10 pt-3 text-[11px]">
@@ -316,20 +319,20 @@ export default function LoginPage() {
                   <button
                     type="button"
                     onClick={() => setShowPassword((value) => !value)}
-                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 transition-colors hover:text-gray-700"
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-500 transition-colors hover:text-gray-700"
                     aria-label={
                       showPassword ? "Hide password" : "Show password"
                     }
                   >
-                    {showPassword ? "◉" : "◌"}
+                    {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
                   </button>
 
                 </div>
 
               </div>
 
-              {/* Remember / Forgot */}
-              <div className="flex items-center justify-between pt-1">
+              {/* Remember device */}
+              <div className="flex items-center pt-1">
 
                 <label className="flex cursor-pointer items-center gap-2">
                   <input
@@ -343,13 +346,6 @@ export default function LoginPage() {
                     Remember this device
                   </span>
                 </label>
-
-                <a
-                  href="#"
-                  className="text-xs font-semibold text-[#006c4a] hover:underline"
-                >
-                  Forgot password?
-                </a>
 
               </div>
 

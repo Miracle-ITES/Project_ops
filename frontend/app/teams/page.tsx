@@ -9,8 +9,11 @@ import { createTeam, listTeams } from "@/lib/teams-api";
 import { ApiError } from "@/lib/api-client";
 import type { TeamOut } from "@/types/teams";
 import { Dialog } from "../../components/dialog";
+import { useAuth } from "@/lib/auth-context";
 
 function TeamsContent() {
+  const { hasPermission } = useAuth();
+  const canManageTeams = hasPermission("teams:manage");
   const [teams, setTeams] = useState<TeamOut[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -68,13 +71,13 @@ function TeamsContent() {
               Manage teams and their membership.
             </p>
           </div>
-          <button
+          {canManageTeams && <button
             onClick={() => setShowForm((s) => !s)}
             className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-primary text-on-primary hover:bg-primary-container font-label-md text-label-md font-semibold shadow-sm self-start"
           >
             <Plus size={18} aria-hidden="true" />
             Add Team
-          </button>
+          </button>}
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-space-md mb-space-lg">
@@ -160,7 +163,7 @@ function TeamsContent() {
 
 export default function TeamsPage() {
   return (
-    <RequireAuth permission="teams:manage">
+    <RequireAuth permission="projects:view">
       <TeamsContent />
     </RequireAuth>
   );

@@ -26,5 +26,12 @@ class Settings(BaseSettings):
 
     ENVIRONMENT: str = "development"
 
+    SMTP_HOST: str | None = None
+    SMTP_PORT: int = 587
+    SMTP_USERNAME: str | None = None
+    SMTP_PASSWORD: str | None = None
+    SMTP_FROM: str = "no-reply@project-ops.local"
+    SMTP_USE_TLS: bool = True
+
 
 settings = Settings() # type: ignore[call-arg]

@@ -25,10 +25,7 @@ def create_team(
 @router.get("", response_model=list[TeamOut])
 def list_teams(
     team_service: TeamService = Depends(get_team_service),
-    # Any authenticated user can browse teams that exist — mutation is
-    # what's Administrator-gated, per your Phase 3 spec ("Admin can create
-    # a team, add members, and view a team roster").
-    _: User = Depends(require_permission("teams:manage")),
+    _: User = Depends(require_any_permission("teams:manage", "project_teams:manage", "projects:view")),
 ):
     return team_service.list_teams()
 
@@ -75,7 +72,7 @@ def remove_member(
 def get_roster(
     team_id: uuid.UUID,
     team_service: TeamService = Depends(get_team_service),
-    _: User = Depends(require_permission("teams:manage")),
+    _: User = Depends(require_any_permission("teams:manage", "project_teams:manage", "projects:view")),
 ):
     try:
         team, memberships = team_service.get_roster(team_id)

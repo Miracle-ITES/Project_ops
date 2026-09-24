@@ -108,10 +108,10 @@ def test_unknown_email_uses_generic_login_error_and_audit():
     assert audit.events[-1]["user_id"] is None
 
 
-def test_inactive_user_is_rejected_with_generic_login_error():
+def test_inactive_user_is_rejected_by_administrator():
     service, _, _ = make_service(make_user(active=False))
 
-    with pytest.raises(AuthError, match="Incorrect email or password"):
+    with pytest.raises(AuthError, match="Access denied by administrator"):
         asyncio.run(service.login(
             email="person@example.com",
             password="correct password",

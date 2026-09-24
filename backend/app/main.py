@@ -5,6 +5,8 @@ from app.api.auth import router as auth_router
 from app.api.projects import router as projects_router
 from app.api.teams import router as teams_router
 from app.api.users import router as users_router
+from app.api.blockers import router as blockers_router
+from app.api.activity import router as activity_router
 
 app = FastAPI()
 
@@ -18,6 +20,8 @@ app.add_middleware(
 
 app.include_router(auth_router)
 app.include_router(users_router)
+app.include_router(blockers_router)
+app.include_router(activity_router)
 app.include_router(teams_router)
 app.include_router(projects_router)
 

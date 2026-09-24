@@ -15,12 +15,41 @@ export function getUser(userId: string): Promise<UserListItemOut> {
 
 export function createUser(payload: {
   email: string;
-  password: string;
   full_name?: string;
   role_name: string;
 }): Promise<UserListItemOut> {
   return authedFetch<UserListItemOut>("/users", {
     method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+}
+
+export interface ProfileUpdate {
+  full_name: string;
+  company_name?: string;
+  job_title?: string;
+  department?: string;
+  phone_number?: string;
+  location?: string;
+}
+
+export function updateMyProfile(
+  payload: ProfileUpdate,
+): Promise<UserListItemOut> {
+  return authedFetch<UserListItemOut>("/users/me/profile", {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+}
+
+export function updateUserProfile(
+  userId: string,
+  payload: ProfileUpdate,
+): Promise<UserListItemOut> {
+  return authedFetch<UserListItemOut>(`/users/${userId}/profile`, {
+    method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
   });

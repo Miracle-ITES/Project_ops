@@ -17,7 +17,6 @@ function UsersContent() {
     const [isLoading, setIsLoading] = useState(true);
     const [showForm, setShowForm] = useState(false);
     const [email, setEmail] = useState("");
-    const [password, setPassword] = useState("");
     const [fullName, setFullName] = useState("");
     const [roleName, setRoleName] = useState("Member");
     const [error, setError] = useState<string | null>(null);
@@ -50,9 +49,8 @@ function UsersContent() {
         setError(null);
         setIsSubmitting(true);
         try {
-            await createUser({ email, password, full_name: fullName || undefined, role_name: roleName });
+            await createUser({ email, full_name: fullName || undefined, role_name: roleName });
             setEmail("");
-            setPassword("");
             setFullName("");
             setRoleName("Member");
             setShowForm(false);
@@ -90,7 +88,7 @@ function UsersContent() {
                 <div className="mb-space-lg flex flex-col justify-between gap-space-md lg:flex-row lg:items-center">
                     <div>
                         <h1 className="font-headline-xl text-headline-xl font-bold tracking-tight text-on-surface">Users &amp; Access</h1>
-                        <p className="mt-0.5 font-body-md text-body-md text-on-surface-variant">Provision accounts and manage access levels.</p>
+                        <p className="mt-0.5 font-body-md text-body-md text-on-surface-variant">Invite members by email and manage access levels.</p>
                     </div>
                     <button
                         type="button"
@@ -123,16 +121,15 @@ function UsersContent() {
                 </div>
 
                 {showForm && (
-                    <Dialog title="Create user" description="Provision an account with an initial access role." onClose={() => setShowForm(false)}>
+                    <Dialog title="Invite user" description="An administrator will send a temporary password by email." onClose={() => setShowForm(false)}>
                         <form onSubmit={handleCreate} className="space-y-3">
                             <input required type="email" placeholder="Email address" value={email} onChange={(event) => setEmail(event.target.value)} className="w-full rounded-lg border border-outline-variant px-3 py-2 text-sm focus:border-secondary focus:outline-none" />
-                            <input required minLength={8} type="password" placeholder="Temporary password" value={password} onChange={(event) => setPassword(event.target.value)} className="w-full rounded-lg border border-outline-variant px-3 py-2 text-sm focus:border-secondary focus:outline-none" />
                             <input placeholder="Full name (optional)" value={fullName} onChange={(event) => setFullName(event.target.value)} className="w-full rounded-lg border border-outline-variant px-3 py-2 text-sm focus:border-secondary focus:outline-none" />
                             <select value={roleName} onChange={(event) => setRoleName(event.target.value)} className="w-full rounded-lg border border-outline-variant px-3 py-2 text-sm focus:border-secondary focus:outline-none">
                                 {ROLE_OPTIONS.map((role) => <option key={role} value={role}>{role}</option>)}
                             </select>
                             <button type="submit" disabled={isSubmitting} className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-on-primary hover:bg-primary-container disabled:opacity-50">
-                                {isSubmitting ? "Creating..." : "Create user"}
+                                {isSubmitting ? "Sending..." : "Send invitation"}
                             </button>
                         </form>
                     </Dialog>
