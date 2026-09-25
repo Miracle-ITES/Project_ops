@@ -139,7 +139,7 @@ function UserDetailContent() {
                             <button type="submit" disabled={isSaving} className="w-full rounded-lg bg-primary px-4 py-2 text-sm font-medium text-on-primary disabled:opacity-50 sm:col-span-2">{isSaving ? "Saving..." : "Save profile"}</button>
                         </div>
                     </form>
-                    <section className="mt-6 border-t border-outline-variant/40 pt-6">
+                    {user.role.name !== "Administrator" && <section className="mt-6 border-t border-outline-variant/40 pt-6">
                         <h2 className="font-headline-md text-headline-md font-bold text-on-surface">Access management</h2>
                         <p className="mt-1 text-sm text-on-surface-variant">Change this account&apos;s role or suspend access.</p>
                         <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -148,7 +148,7 @@ function UserDetailContent() {
                             </select>
                             <button type="button" disabled={isAccessSaving} onClick={() => void handleActiveChange()} className="w-full rounded-lg border border-outline-variant px-4 py-2 text-sm font-medium text-on-surface hover:border-secondary hover:text-secondary disabled:opacity-50">{user.is_active ? "Deactivate account" : "Activate account"}</button>
                         </div>
-                    </section>
+                    </section>}
                     <div className="mt-6"><h2 className="font-headline-md text-headline-md font-bold text-on-surface">Permissions</h2><div className="mt-3 flex flex-wrap gap-2">{user.role.permissions.map((permission) => <span key={permission} className="rounded-md bg-surface-container-low px-2 py-1 text-xs text-on-surface-variant">{permission}</span>)}</div></div>
                 </section>
             </div>

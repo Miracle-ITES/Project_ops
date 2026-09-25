@@ -70,6 +70,16 @@ python -m app.seed_roles
 
 Create an initial administrator after seeding, using `backend/app/create_test_user.py`.
 
+To reset the local database and start from an empty PostgreSQL volume:
+
+```bash
+docker compose -f infra/docker-compose.yml down -v
+docker compose -f infra/docker-compose.yml up -d
+cd backend
+alembic upgrade head
+python -m app.seed_roles
+```
+
 ## Services
 
 | Service           | URL                        |
@@ -84,19 +94,21 @@ Create an initial administrator after seeding, using `backend/app/create_test_us
 
 The frontend currently includes:
 
-| Route                    | Description                                                  |
-| ------------------------ | ------------------------------------------------------------ |
-| `/login`                 | Sign in and restore a session                                |
-| `/dashboard`             | Project health and operational overview                      |
-| `/users`                 | Administrator user provisioning and access management        |
-| `/users/{user_id}`       | User profile and administrator access management             |
-| `/profile`               | Signed-in user's company profile                             |
-| `/teams`                 | Team directory; Leads can view, Administrators can manage    |
-| `/teams/{team_id}`       | Team roster; membership changes are Administrator-only       |
-| `/projects`              | Project directory and project creation                       |
-| `/projects/{project_id}` | Project details, team/contributor assignment, and milestones |
-| `/blockers`              | Raise and resolve project blockers                           |
-| `/activity`              | Recent authentication and administrative activity            |
+| Route                    | Description                                                     |
+| ------------------------ | --------------------------------------------------------------- |
+| `/login`                 | Sign in and restore a session                                   |
+| `/dashboard`             | Project health and operational overview                         |
+| `/users`                 | User requests, administrator approvals, and access management   |
+| `/users/{user_id}`       | User profile and administrator access management                |
+| `/profile`               | Signed-in user's company profile                                |
+| `/teams`                 | Team directory; Leads can view, Administrators can manage       |
+| `/teams/{team_id}`       | Team roster; membership changes are Administrator-only          |
+| `/projects`              | Project directory and project creation                          |
+| `/projects/{project_id}` | Project details, team/contributor assignment, and milestones    |
+| `/blockers`              | Raise and resolve project blockers                              |
+| `/activity`              | Recent authentication and administrative activity               |
+| `/tasks`                 | Live Kanban board for Backlog, In Progress, and Completed tasks |
+| `/updates`               | Daily updates and dated KT/Learning session tracking            |
 
 ## Health Check
 
@@ -125,31 +137,36 @@ Inactive users with valid credentials receive `Access denied by administrator`. 
 
 The application uses granular permission codes through `require_permission`, rather than hardcoded role checks.
 
-| Role           | Phase 3/4 capabilities                                                                           |
-| -------------- | ------------------------------------------------------------------------------------------------ |
-| Administrator  | Manage users, teams, projects, roles, and all seeded permissions                                 |
-| Lead/Manager   | View teams and rosters, assign project teams, create and view projects, and manage assigned work |
-| Member         | View assigned work and project data where permitted; cannot create projects                      |
-| Viewer/Auditor | Read-only dashboard, project, report, and audit access                                           |
+| Role           | Capabilities                                                                                                    |
+| -------------- | --------------------------------------------------------------------------------------------------------------- |
+| Administrator  | Manage users, teams, projects, roles, and all seeded permissions                                                |
+| Lead/Manager   | Create/manage teams, add existing users, request new users for admin approval, assign work, and manage projects |
+| Member         | View assigned work and project data where permitted; cannot create projects                                     |
+| Viewer/Auditor | Read-only dashboard, project, report, and audit access                                                          |
 
 Roles and permissions are defined in `backend/app/seed_roles.py`. The seed command is safe to rerun and preserves manually granted permissions.
 
 ## Phase 3: Users and Teams
 
-Phase 3 adds administrator-managed users, teams, memberships, and roster views. Team browsing is available to users with `projects:view`, `project_teams:manage`, or `teams:manage`; membership mutations remain administrator-only through `teams:manage`.
+Phase 3 adds users, teams, memberships, roster views, and administrator-approved invitation requests. Team browsing is available to users with `projects:view`, `project_teams:manage`, or `teams:manage`; Lead/Manager and Administrator roles can manage teams and memberships.
 
 ### Users
 
-| Method | Endpoint                   | Description                                                     |
-| ------ | -------------------------- | --------------------------------------------------------------- |
-| POST   | `/users`                   | Administrator-only email invitation with role and optional name |
-| GET    | `/users`                   | List users and their roles and permissions                      |
-| GET    | `/users/assignable`        | List users assignable to teams or projects                      |
-| GET    | `/users/{user_id}`         | Get one user                                                    |
-| PATCH  | `/users/me/profile`        | Complete the signed-in user's first-login profile               |
-| PATCH  | `/users/{user_id}/profile` | Administrator updates any user's profile                        |
-| PATCH  | `/users/{user_id}/role`    | Change a user's role                                            |
-| PATCH  | `/users/{user_id}/active`  | Activate or deactivate a user                                   |
+| Method | Endpoint                       | Description                                                     |
+| ------ | ------------------------------ | --------------------------------------------------------------- |
+| POST   | `/users`                       | Administrator-only email invitation with role and optional name |
+| POST   | `/users/requests`              | Lead/Manager request for an administrator-approved invitation   |
+| GET    | `/users/requests`              | Administrator list of invitation requests                       |
+| GET    | `/users/requests/mine`         | Requester’s invitation history                                  |
+| POST   | `/users/requests/{id}/approve` | Administrator approval; creates account and sends email         |
+| POST   | `/users/requests/{id}/reject`  | Administrator rejection                                         |
+| GET    | `/users`                       | List users and their roles and permissions                      |
+| GET    | `/users/assignable`            | List users assignable to teams or projects                      |
+| GET    | `/users/{user_id}`             | Get one user                                                    |
+| PATCH  | `/users/me/profile`            | Complete the signed-in user's first-login profile               |
+| PATCH  | `/users/{user_id}/profile`     | Administrator updates any user's profile                        |
+| PATCH  | `/users/{user_id}/role`        | Change a user's role                                            |
+| PATCH  | `/users/{user_id}/active`      | Activate or deactivate a user                                   |
 
 Example request:
 
@@ -160,7 +177,7 @@ Example request:
 }
 ```
 
-The backend generates a temporary password and sends it to the invited email address. SMTP must be configured for invitations to succeed. Invited users must complete their company profile on first login; after submission, users cannot edit their own profile and only Administrators can change it.
+Administrator invitations generate a temporary password and send it by email. Lead/Manager requests never send email directly; the email is sent only after administrator approval. SMTP must be configured for invitations to succeed. Invited users must complete their company profile on first login; after submission, users cannot edit their own profile and only Administrators can change it.
 
 ### Teams
 
@@ -174,6 +191,26 @@ The backend generates a temporary password and sends it to the invited email add
 | GET    | `/teams/{team_id}/roster`            | View the team and member roster   |
 
 Team membership is stored in `team_memberships` and enforces one membership per team/user pair.
+
+## Work Management
+
+Tasks, daily updates, and learning/KT sessions use live PostgreSQL data. The Tasks page provides a Kanban board with drag-and-drop status transitions through `backlog`, `in_progress`, and `completed`.
+
+| Method | Endpoint                  | Description                                                          |
+| ------ | ------------------------- | -------------------------------------------------------------------- |
+| GET    | `/tasks`                  | Paginated, searchable, status-filtered task list                     |
+| POST   | `/tasks`                  | Create a task with priority, due date, assignee, and reviewer        |
+| PATCH  | `/tasks/{task_id}`        | Update task details or move status                                   |
+| DELETE | `/tasks/{task_id}`        | Delete a task                                                        |
+| GET    | `/daily-updates`          | Paginated consolidated daily updates                                 |
+| POST   | `/daily-updates`          | Submit or update a dated daily update                                |
+| GET    | `/learning`               | Paginated learning and KT session records                            |
+| POST   | `/learning`               | Create a learning topic or KT session with session date              |
+| PATCH  | `/learning/{item_id}`     | Track learning progress to completion                                |
+| GET    | `/dashboard`              | Live KPI counts for projects, tasks, blockers, learning, and updates |
+| GET    | `/exports/{resource}.csv` | CSV export for tasks, daily updates, or learning                     |
+
+Significant work-management mutations write audit entries. Dashboard metrics and project health are queried from the database; no placeholder operational metrics are used.
 
 ## Phase 4: Projects
 
@@ -256,6 +293,8 @@ Current migration chain:
     └── 0004_project_teams
       └── 0005_invitations_blockers
         └── 0006_user_company_profile
+          └── 0007_work_management
+            └── 0008_invitation_requests
 ```
 
 ## Implementation Status
@@ -287,6 +326,8 @@ Current migration chain:
 - [x] Administrator email invitations with generated temporary passwords
 - [x] First-login company profile completion and administrator-only edits
 - [x] Lead read-only team and roster access
+- [x] Lead/Manager team and membership management
+- [x] Lead/Manager invitation requests with administrator approval
 
 ### Phase 4: Projects
 
@@ -304,3 +345,8 @@ Current migration chain:
 - [x] Activity feed for authentication, invitations, and blocker events
 - [x] Inactive-account administrator denial message
 - [x] Responsive personal and administrator profile sections
+- [x] Live dashboard KPI queries and project health data
+- [x] Kanban task workflow with drag-and-drop status changes
+- [x] Dated daily updates and learning/KT session tracking
+- [x] Paginated work-management lists and CSV exports
+- [x] Administrator-only access controls hidden for Administrator account details

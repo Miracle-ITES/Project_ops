@@ -5,6 +5,8 @@ import { RequireAuth } from "@/components/require-auth";
 import { AppShell } from "@/components/app-shell";
 import { useAuth } from "@/lib/auth-context";
 import { listProjects } from "@/lib/projects-api";
+import { getDashboard } from "@/lib/work-api";
+import type { Dashboard } from "@/types/work";
 import type { ProjectListItemOut, ProjectMaturity } from "@/types/projects";
 
 const HEALTH_BADGE: Record<ProjectMaturity, { text: string; dot: string; className: string }> = {
@@ -19,10 +21,11 @@ function DashboardContent() {
   const { user } = useAuth();
   const [projects, setProjects] = useState<ProjectListItemOut[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [metrics, setMetrics] = useState<Dashboard | null>(null);
 
   useEffect(() => {
-    listProjects()
-      .then(setProjects)
+    Promise.all([listProjects(), getDashboard()])
+      .then(([projectItems, dashboardMetrics]) => { setProjects(projectItems); setMetrics(dashboardMetrics); })
       .finally(() => setIsLoading(false));
   }, []);
 
@@ -43,37 +46,32 @@ function DashboardContent() {
           </div>
         </div>
 
-        {/* KPI cards — Active Projects is real; the rest have no backend
-            yet (Tasks, Blockers, Team Progress) so they stay static. */}
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-space-md mb-space-lg">
           <div className="p-4 rounded-xl bg-surface-container-lowest shadow-sm">
             <span className="font-label-sm text-label-sm uppercase tracking-wider font-semibold text-outline">
               Active Projects
             </span>
             <div className="mt-3 font-display-lg text-display-lg font-bold text-on-surface tracking-tight">
-              {isLoading ? "…" : projects.length}
+              {isLoading ? "…" : metrics?.active_projects ?? 0}
             </div>
           </div>
           <div className="p-4 rounded-xl bg-surface-container-lowest shadow-sm">
             <span className="font-label-sm text-label-sm uppercase tracking-wider font-semibold text-outline">
               Tasks Due Today
             </span>
-            <div className="mt-3 font-display-lg text-display-lg font-bold text-on-surface tracking-tight">34</div>
-            <p className="mt-3 font-body-sm text-body-sm text-on-surface-variant">Placeholder — no Tasks module yet</p>
+            <div className="mt-3 font-display-lg text-display-lg font-bold text-on-surface tracking-tight">{isLoading ? "…" : metrics?.tasks_due_today ?? 0}</div>
           </div>
           <div className="p-4 rounded-xl bg-surface-container-lowest shadow-sm">
             <span className="font-label-sm text-label-sm uppercase tracking-wider font-semibold text-outline">
               Open Blockers
             </span>
-            <div className="mt-3 font-display-lg text-display-lg font-bold text-error tracking-tight">4</div>
-            <p className="mt-3 font-body-sm text-body-sm text-on-surface-variant">Placeholder — no Blockers module yet</p>
+            <div className="mt-3 font-display-lg text-display-lg font-bold text-error tracking-tight">{isLoading ? "…" : metrics?.open_blockers ?? 0}</div>
           </div>
           <div className="p-4 rounded-xl bg-surface-container-lowest shadow-sm">
             <span className="font-label-sm text-label-sm uppercase tracking-wider font-semibold text-outline">
               Team Progress
             </span>
-            <div className="mt-3 font-display-lg text-display-lg font-bold text-secondary tracking-tight">86%</div>
-            <p className="mt-3 font-body-sm text-body-sm text-on-surface-variant">Placeholder — no progress metric yet</p>
+            <div className="mt-3 font-display-lg text-display-lg font-bold text-secondary tracking-tight">{isLoading || !metrics || metrics.task_total === 0 ? "0%" : `${Math.round((metrics.completed_tasks / metrics.task_total) * 100)}%`}</div>
           </div>
         </div>
 
@@ -141,45 +139,23 @@ function DashboardContent() {
               </div>
             </div>
 
-            {/* Task Overview — static, no Tasks backend yet */}
             <div className="p-space-md rounded-xl bg-surface-container-lowest shadow-sm">
               <div className="pb-space-md flex items-center gap-space-sm">
                 <h2 className="font-headline-md text-headline-md font-bold text-on-surface">Task Overview</h2>
-                <span className="px-2 py-0.5 rounded-md bg-surface-container-low text-on-surface-variant font-code-sm text-code-sm">
-                  Static preview — no Tasks module yet
-                </span>
               </div>
-              <div className="space-y-3">
-                {[
-                  { title: "Complete dashboard UI", status: "In Progress" },
-                  { title: "Connect project API", status: "To Do" },
-                  { title: "Fix authentication flow", status: "Completed" },
-                ].map((task) => (
-                  <div
-                    key={task.title}
-                    className="flex items-center justify-between rounded-lg bg-surface-container-low/60 p-4"
-                  >
-                    <span className="text-sm font-medium text-on-surface">{task.title}</span>
-                    <span className="text-xs text-on-surface-variant">{task.status}</span>
-                  </div>
-                ))}
-              </div>
+              <p className="text-sm text-on-surface-variant">{metrics?.completed_tasks ?? 0} of {metrics?.task_total ?? 0} tasks completed.</p>
             </div>
           </div>
 
           <div className="lg:col-span-4 flex flex-col gap-space-lg">
-            {/* Active Blockers — static, no Blockers backend yet */}
             <div className="p-space-md rounded-xl bg-surface-container-lowest shadow-sm">
               <div className="pb-space-sm flex items-center gap-2">
                 <h2 className="font-headline-md text-headline-md font-bold text-on-surface">Active Blockers</h2>
-                <span className="px-2 py-0.5 rounded-md bg-surface-container-low text-on-surface-variant font-code-sm text-code-sm">
-                  Static preview
-                </span>
               </div>
               <div className="space-y-space-sm mt-1">
                 <div className="p-3 rounded-lg bg-error-container/40">
-                  <p className="text-sm font-medium text-on-error-container">Authentication API integration</p>
-                  <p className="mt-1 text-xs text-on-error-container/80">Waiting for backend endpoint</p>
+                  <p className="text-sm font-medium text-on-error-container">{metrics?.open_blockers ?? 0} blockers need attention</p>
+                  <p className="mt-1 text-xs text-on-error-container/80">Live from the blockers register</p>
                 </div>
               </div>
             </div>

@@ -7,14 +7,15 @@ import { updateMyProfile } from "@/lib/users-api";
 import { ApiError } from "@/lib/api-client";
 import { useState, type FormEvent } from "react";
 
-export type NavKey = "dashboard" | "projects" | "team" | "users" | "blockers" | "activity";
+export type NavKey = "dashboard" | "projects" | "tasks" | "updates" | "team" | "users" | "blockers" | "activity";
 
 const NAV_ITEMS: { key: NavKey | "disabled"; label: string; icon: typeof LayoutDashboard; href?: string; permission?: string }[] = [
   { key: "dashboard", label: "Dashboard", icon: LayoutDashboard, href: "/dashboard" },
   { key: "projects", label: "Projects", icon: FolderOpen, href: "/projects" },
-  { key: "disabled", label: "Tasks", icon: CheckSquare },
+  { key: "tasks", label: "Tasks", icon: CheckSquare, href: "/tasks" },
+  { key: "updates", label: "Updates", icon: Sparkles, href: "/updates" },
   { key: "team", label: "Team", icon: UsersRound, href: "/teams" },
-  { key: "users", label: "Users", icon: UserCog, href: "/users", permission: "users:manage" },
+  { key: "users", label: "Users", icon: UserCog, href: "/users", permission: "users:request" },
   { key: "blockers", label: "Blockers", icon: TriangleAlert, href: "/blockers", permission: "projects:view" },
   { key: "activity", label: "Activity", icon: Activity, href: "/activity", permission: "audit:view" },
   { key: "disabled", label: "AI Assistant", icon: Sparkles },
@@ -114,7 +115,7 @@ export function AppShell({ active, breadcrumb, children }: AppShellProps) {
                 : "flex items-center gap-space-sm px-space-sm py-2 rounded-lg text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors";
 
               if (!item.href) {
-                // Tasks and AI Assistant are present until their backend flows are added.
+                // Keep unfinished navigation visible without making it interactive.
                 return (
                   <span
                     key={item.label}

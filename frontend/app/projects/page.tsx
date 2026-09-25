@@ -150,13 +150,6 @@ function ProjectsContent() {
               </span>
             </div>
           </div>
-          <div className="p-4 rounded-xl bg-surface-container-lowest shadow-sm">
-            <span className="font-label-sm text-label-sm uppercase tracking-wider font-semibold text-outline">
-              Sprint Commitments
-            </span>
-            <div className="mt-3 font-display-lg text-display-lg font-bold text-on-surface tracking-tight">12</div>
-            <p className="mt-2 font-body-sm text-body-sm text-on-surface-variant">Placeholder — no Milestone summary yet</p>
-          </div>
         </div>
 
         {canCreate && showForm && (

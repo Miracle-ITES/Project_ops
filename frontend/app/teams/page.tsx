@@ -89,20 +89,6 @@ function TeamsContent() {
               {isLoading ? "…" : teams.length}
             </div>
           </div>
-          <div className="p-4 rounded-xl bg-surface-container-lowest shadow-sm">
-            <span className="font-label-sm text-label-sm uppercase tracking-wider font-semibold text-outline">
-              Capacity Allocation
-            </span>
-            <div className="mt-3 font-display-lg text-display-lg font-bold text-on-surface tracking-tight">84%</div>
-            <p className="mt-2 font-body-sm text-body-sm text-on-surface-variant">Placeholder — no capacity metric yet</p>
-          </div>
-          <div className="p-4 rounded-xl bg-surface-container-lowest shadow-sm">
-            <span className="font-label-sm text-label-sm uppercase tracking-wider font-semibold text-outline">
-              On-call Responders
-            </span>
-            <div className="mt-3 font-display-lg text-display-lg font-bold text-on-surface tracking-tight">4</div>
-            <p className="mt-2 font-body-sm text-body-sm text-on-surface-variant">Placeholder — no on-call module yet</p>
-          </div>
         </div>
 
         {showForm && (

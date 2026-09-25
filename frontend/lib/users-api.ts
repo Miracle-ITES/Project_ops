@@ -1,5 +1,5 @@
 import { authedFetch } from "./api-client";
-import type { UserListItemOut } from "@/types/users";
+import type { InvitationRequestOut, UserListItemOut } from "@/types/users";
 
 export function listUsers(): Promise<UserListItemOut[]> {
   return authedFetch<UserListItemOut[]>("/users");
@@ -22,6 +22,48 @@ export function createUser(payload: {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
+  });
+}
+
+export function requestUser(payload: {
+  email: string;
+  full_name?: string;
+  role_name: string;
+}): Promise<InvitationRequestOut> {
+  return authedFetch<InvitationRequestOut>("/users/requests", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+}
+
+export function listInvitationRequests(): Promise<InvitationRequestOut[]> {
+  return authedFetch<InvitationRequestOut[]>("/users/requests");
+}
+
+export function listMyInvitationRequests(): Promise<InvitationRequestOut[]> {
+  return authedFetch<InvitationRequestOut[]>("/users/requests/mine");
+}
+
+export function approveInvitationRequest(
+  id: string,
+  note?: string,
+): Promise<UserListItemOut> {
+  return authedFetch<UserListItemOut>(`/users/requests/${id}/approve`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ note }),
+  });
+}
+
+export function rejectInvitationRequest(
+  id: string,
+  note?: string,
+): Promise<InvitationRequestOut> {
+  return authedFetch<InvitationRequestOut>(`/users/requests/${id}/reject`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ note }),
   });
 }
 

@@ -7,13 +7,18 @@ import { RequireAuth } from "@/components/require-auth";
 import { AppShell } from "@/components/app-shell";
 import { Dialog } from "../../components/dialog";
 import { ApiError } from "@/lib/api-client";
-import { changeUserRole, createUser, listUsers, setUserActive } from "@/lib/users-api";
-import type { UserListItemOut } from "@/types/users";
+import { useAuth } from "@/lib/auth-context";
+import { approveInvitationRequest, changeUserRole, createUser, listInvitationRequests, listMyInvitationRequests, listUsers, rejectInvitationRequest, requestUser, setUserActive } from "@/lib/users-api";
+import type { InvitationRequestOut, UserListItemOut } from "@/types/users";
 
 const ROLE_OPTIONS = ["Administrator", "Lead/Manager", "Member", "Viewer/Auditor"];
 
 function UsersContent() {
+    const { hasPermission } = useAuth();
+    const canManageUsers = hasPermission("users:manage");
+    const canRequestUsers = hasPermission("users:request");
     const [users, setUsers] = useState<UserListItemOut[]>([]);
+    const [requests, setRequests] = useState<InvitationRequestOut[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [showForm, setShowForm] = useState(false);
     const [email, setEmail] = useState("");
@@ -25,13 +30,15 @@ function UsersContent() {
     const load = useCallback(async () => {
         setIsLoading(true);
         try {
-            setUsers(await listUsers());
+            const loadedUsers = canManageUsers ? await listUsers() : [];
+            setUsers(loadedUsers);
+            setRequests(canManageUsers ? await listInvitationRequests() : await listMyInvitationRequests());
         } catch (err) {
             setError(err instanceof ApiError ? err.message : "Failed to load users.");
         } finally {
             setIsLoading(false);
         }
-    }, []);
+    }, [canManageUsers]);
 
     useEffect(() => {
         let cancelled = false;
@@ -49,7 +56,11 @@ function UsersContent() {
         setError(null);
         setIsSubmitting(true);
         try {
-            await createUser({ email, full_name: fullName || undefined, role_name: roleName });
+            if (canManageUsers) {
+                await createUser({ email, full_name: fullName || undefined, role_name: roleName });
+            } else {
+                await requestUser({ email, full_name: fullName || undefined, role_name: roleName });
+            }
             setEmail("");
             setFullName("");
             setRoleName("Member");
@@ -61,6 +72,21 @@ function UsersContent() {
             setIsSubmitting(false);
         }
     };
+
+    async function reviewRequest(request: InvitationRequestOut, approved: boolean) {
+        setError(null);
+        try {
+            if (approved) {
+                await approveInvitationRequest(request.id);
+            } else {
+                await rejectInvitationRequest(request.id);
+            }
+            setRequests((current) => current.filter((item) => item.id !== request.id));
+            if (approved) await load();
+        } catch (err) {
+            setError(err instanceof ApiError ? err.message : "Failed to review invitation request.");
+        }
+    }
 
     async function handleRoleChange(userId: string, nextRole: string) {
         setError(null);
@@ -90,7 +116,7 @@ function UsersContent() {
                         <h1 className="font-headline-xl text-headline-xl font-bold tracking-tight text-on-surface">Users &amp; Access</h1>
                         <p className="mt-0.5 font-body-md text-body-md text-on-surface-variant">Invite members by email and manage access levels.</p>
                     </div>
-                    <button
+                    {canRequestUsers && <button
                         type="button"
                         onClick={() => {
                             setError(null);
@@ -99,8 +125,8 @@ function UsersContent() {
                         className="inline-flex items-center gap-1.5 self-start rounded-lg bg-primary px-3.5 py-1.5 font-label-md text-label-md font-semibold text-on-primary shadow-sm transition-all hover:bg-primary-container"
                     >
                         <Plus size={18} aria-hidden="true" />
-                        New User
-                    </button>
+                        {canManageUsers ? "New User" : "Request User"}
+                    </button>}
                 </div>
 
                 {error && <p className="mb-4 rounded-lg bg-error-container px-3 py-2 text-sm text-on-error-container">{error}</p>}
@@ -121,19 +147,23 @@ function UsersContent() {
                 </div>
 
                 {showForm && (
-                    <Dialog title="Invite user" description="An administrator will send a temporary password by email." onClose={() => setShowForm(false)}>
+                    <Dialog title={canManageUsers ? "Invite user" : "Request user"} description={canManageUsers ? "This sends the invitation email immediately." : "An administrator must approve this request before any email is sent."} onClose={() => setShowForm(false)}>
                         <form onSubmit={handleCreate} className="space-y-3">
                             <input required type="email" placeholder="Email address" value={email} onChange={(event) => setEmail(event.target.value)} className="w-full rounded-lg border border-outline-variant px-3 py-2 text-sm focus:border-secondary focus:outline-none" />
                             <input placeholder="Full name (optional)" value={fullName} onChange={(event) => setFullName(event.target.value)} className="w-full rounded-lg border border-outline-variant px-3 py-2 text-sm focus:border-secondary focus:outline-none" />
                             <select value={roleName} onChange={(event) => setRoleName(event.target.value)} className="w-full rounded-lg border border-outline-variant px-3 py-2 text-sm focus:border-secondary focus:outline-none">
-                                {ROLE_OPTIONS.map((role) => <option key={role} value={role}>{role}</option>)}
+                                {ROLE_OPTIONS.filter((role) => canManageUsers || role !== "Administrator").map((role) => <option key={role} value={role}>{role}</option>)}
                             </select>
                             <button type="submit" disabled={isSubmitting} className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-on-primary hover:bg-primary-container disabled:opacity-50">
-                                {isSubmitting ? "Sending..." : "Send invitation"}
+                                {isSubmitting ? "Submitting..." : canManageUsers ? "Send invitation" : "Submit for approval"}
                             </button>
                         </form>
                     </Dialog>
                 )}
+
+                {canManageUsers && requests.some((request) => request.status === "pending") && <section className="mb-space-lg rounded-xl bg-surface-container-lowest p-space-md shadow-sm"><h2 className="font-headline-md font-bold text-on-surface">Pending user approvals</h2><div className="mt-3 space-y-2">{requests.filter((request) => request.status === "pending").map((request) => <div key={request.id} className="flex flex-col gap-3 border-t border-outline-variant/40 py-3 sm:flex-row sm:items-center sm:justify-between"><div><p className="font-semibold text-on-surface">{request.full_name || request.email}</p><p className="text-xs text-on-surface-variant">{request.email} · {request.role_name} · requested by {request.requested_by_name || "team lead"}</p></div><div className="flex gap-2"><button type="button" onClick={() => void reviewRequest(request, false)} className="rounded-lg border border-error px-3 py-1.5 text-xs font-semibold text-error">Reject</button><button type="button" onClick={() => void reviewRequest(request, true)} className="rounded-lg bg-secondary px-3 py-1.5 text-xs font-semibold text-on-secondary">Approve &amp; email</button></div></div>)}</div></section>}
+
+                {requests.length > 0 && <section className="mb-space-lg rounded-xl bg-surface-container-lowest p-space-md shadow-sm"><div className="flex flex-wrap gap-3"><span className="rounded-lg bg-amber-100 px-3 py-2 text-xs font-semibold text-amber-900">Request: {requests.filter((request) => request.status === "pending").length}</span><span className="rounded-lg bg-secondary-container/60 px-3 py-2 text-xs font-semibold text-on-secondary-container">Approved: {requests.filter((request) => request.status === "approved").length}</span><span className="rounded-lg bg-surface-container-high px-3 py-2 text-xs font-semibold text-on-surface-variant">New user: {requests.filter((request) => request.status === "approved").length}</span></div><div className="mt-3 space-y-2">{requests.map((request) => <div key={request.id} className="flex items-center justify-between border-t border-outline-variant/40 py-2 text-sm"><span className="text-on-surface">{request.full_name || request.email}</span><span className="text-xs font-semibold capitalize text-on-surface-variant">{request.status}</span></div>)}</div></section>}
 
                 <div className="overflow-x-auto rounded-xl bg-surface-container-lowest p-space-md shadow-sm">
                     <table className="w-full min-w-180 text-left font-body-md text-body-md">
@@ -177,7 +207,7 @@ function UsersContent() {
 
 export default function UsersPage() {
     return (
-        <RequireAuth permission="users:manage">
+        <RequireAuth>
             <UsersContent />
         </RequireAuth>
     );

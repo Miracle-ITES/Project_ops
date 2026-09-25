@@ -67,6 +67,10 @@ def get_blocker_repository(db: Session = Depends(get_db)) -> BlockerRepository:
     return BlockerRepository(db)
 
 
+def get_work_db(db: Session = Depends(get_db)) -> Session:
+    return db
+
+
 # --- Services ---
 
 async def get_rate_limiter() -> LoginRateLimiter:

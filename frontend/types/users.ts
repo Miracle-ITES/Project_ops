@@ -13,3 +13,18 @@ export interface UserListItemOut {
   location: string | null;
   role: RoleOut;
 }
+
+export type InvitationRequestStatus = "pending" | "approved" | "rejected";
+
+export interface InvitationRequestOut {
+  id: string;
+  email: string;
+  full_name: string | null;
+  role_name: string;
+  status: InvitationRequestStatus;
+  requested_by_id: string;
+  requested_by_name: string | null;
+  created_at: string;
+  reviewed_at: string | null;
+  review_note: string | null;
+}

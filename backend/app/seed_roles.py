@@ -13,6 +13,7 @@ from app.domain.user import Role
 
 ALL_PERMISSIONS = {
     "users:manage": "Create, edit, deactivate users",
+    "users:request": "Request new users for administrator approval",
     "teams:manage": "Create and manage teams",
     "projects:manage": "Full CRUD on any project",
     "roles:manage": "Create/edit roles and permission assignments",
@@ -54,6 +55,7 @@ ROLE_DEFINITIONS = {
         ),
         "permissions": {
             "projects:create", "tasks:assign", "work:review", "blockers:manage",
+            "teams:manage", "users:request",
             "project_teams:manage",
             "learning_kt:manage", "work:view_assigned", "status:update",
             "daily_updates:submit", "dashboards:view", "projects:view", "reports:view",
