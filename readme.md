@@ -107,7 +107,7 @@ The frontend currently includes:
 | `/projects/{project_id}` | Project details, team/contributor assignment, and milestones    |
 | `/blockers`              | Raise and resolve project blockers                              |
 | `/activity`              | Recent authentication and administrative activity               |
-| `/tasks`                 | Live Kanban board for Backlog, In Progress, and Completed tasks |
+| `/tasks`                 | Project-linked Kanban board with task assignment and status updates |
 | `/updates`               | Daily updates and dated KT/Learning session tracking            |
 
 ## Health Check
@@ -201,9 +201,9 @@ Tasks, daily updates, and learning/KT sessions use live PostgreSQL data. The Tas
 
 | Method | Endpoint                  | Description                                                          |
 | ------ | ------------------------- | -------------------------------------------------------------------- |
-| GET    | `/tasks`                  | Paginated, searchable, status-filtered task list                     |
-| POST   | `/tasks`                  | Create a task with priority, due date, assignee, and reviewer        |
-| PATCH  | `/tasks/{task_id}`        | Update task details or move status                                   |
+| GET    | `/tasks`                  | Paginated, searchable, status-filtered task list scoped to the caller |
+| POST   | `/tasks`                  | Create a project-linked task with priority, due date, assignee, and reviewer |
+| PATCH  | `/tasks/{task_id}`        | Update task details, assignment, or status                            |
 | DELETE | `/tasks/{task_id}`        | Delete a task                                                        |
 | GET    | `/daily-updates`          | Paginated consolidated daily updates                                 |
 | POST   | `/daily-updates`          | Submit or update a dated daily update                                |
@@ -215,6 +215,8 @@ Tasks, daily updates, and learning/KT sessions use live PostgreSQL data. The Tas
 
 Significant work-management mutations write audit entries. Dashboard metrics and project health are queried from the database; no placeholder operational metrics are used.
 
+Task assignment is limited to active members of the selected project (the owner, contributors, and members of assigned teams). Leads/Managers can create tasks and change assignments only on projects they own; Administrators can manage assignments across projects. Members see tasks assigned to them within projects assigned to them and can update only those tasks' status. Leads see tasks belonging to their owned projects. Project contributors, team assignments, metadata, and member rosters can be managed by that project's owner or an Administrator; a Lead cannot manage another owner's project.
+
 ## Phase 4: Projects
 
 Phase 4 adds projects, contributors, milestones, and project-team assignment. Project priorities are `low`, `medium`, `high`, or `critical`. Project maturity values are `planning`, `active`, `at_risk`, `blocked`, or `completed`.
@@ -222,8 +224,8 @@ Phase 4 adds projects, contributors, milestones, and project-team assignment. Pr
 | Method | Endpoint                                 | Permission             | Description                                         |
 | ------ | ---------------------------------------- | ---------------------- | --------------------------------------------------- |
 | POST   | `/projects`                              | `projects:create`      | Create a project; `owner_id` defaults to the caller |
-| GET    | `/projects`                              | `projects:view`        | List projects                                       |
-| GET    | `/projects/{project_id}`                 | `projects:view`        | Get project details, contributors, and milestones   |
+| GET    | `/projects`                              | `projects:view` or `projects:view_assigned` | List projects in the caller's visibility scope |
+| GET    | `/projects/{project_id}`                 | `projects:view` or `projects:view_assigned` | Get visible project details, contributors, and milestones |
 | PATCH  | `/projects/{project_id}`                 | `projects:create`      | Update project metadata                             |
 | POST   | `/projects/{project_id}/contributors`    | `projects:create`      | Add a contributor                                   |
 | POST   | `/projects/{project_id}/milestones`      | `projects:create`      | Add a milestone                                     |
@@ -298,6 +300,8 @@ Current migration chain:
         └── 0006_user_company_profile
           └── 0007_work_management
             └── 0008_invitation_requests
+          └── 0009_indexes_for_lists
+            └── 0010_task_project_scope
 ```
 
 ## Implementation Status
@@ -350,6 +354,10 @@ Current migration chain:
 - [x] Responsive personal and administrator profile sections
 - [x] Live dashboard KPI queries and project health data
 - [x] Kanban task workflow with drag-and-drop status changes
+- [x] Project-linked tasks with project-member assignment controls
+- [x] Project visibility scoped by role, ownership, and project assignment
+- [x] Task list visibility limited to members' assigned tasks
+- [x] Lead/Manager project membership and team management restricted to owned projects
 - [x] Dated daily updates and learning/KT session tracking
 - [x] Paginated work-management lists and CSV exports
 - [x] Administrator-only access controls hidden for Administrator account details

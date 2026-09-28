@@ -80,6 +80,9 @@ def list_tasks(
 
 @router.post("/tasks", response_model=TaskOut, status_code=status.HTTP_201_CREATED)
 def create_task(payload: TaskCreate, db: Session = Depends(get_work_db), user: User = Depends(require_permission("projects:create", revalidate_from_db=True)), project_service: ProjectService = Depends(get_project_service)):
+    permissions = {permission.code for permission in user.role.permissions}
+    if (payload.assignee_id or payload.reviewer_id) and "tasks:assign" not in permissions:
+        raise HTTPException(status_code=403, detail="You do not have permission to assign tasks")
     try:
         project_service.get_visible_project(payload.project_id, user)
     except ProjectError as exc:
@@ -113,6 +116,8 @@ def update_task(task_id: uuid.UUID, payload: TaskUpdate, db: Session = Depends(g
         except ProjectError:
             raise HTTPException(status_code=404, detail="Task not found")
         target_assignee = changes.get("assignee_id", task.assignee_id)
+        if ("assignee_id" in changes or "reviewer_id" in changes) and "tasks:assign" not in permissions:
+            raise HTTPException(status_code=403, detail="You do not have permission to assign tasks")
         if target_assignee and not project_service.is_project_member(task.project_id, target_assignee):
             raise HTTPException(status_code=400, detail="Assignee must belong to the selected project")
         target_reviewer = changes.get("reviewer_id", task.reviewer_id)

@@ -25,10 +25,11 @@ const priorityClass: Record<TaskPriority, string> = {
 function TasksContent() {
     const { user, hasPermission } = useAuth();
     const canCreateTasks = hasPermission("projects:create");
+    const canAssignTasks = hasPermission("tasks:assign");
     const canUpdateAssignedTasks = hasPermission("status:update");
     const [tasks, setTasks] = useState<Task[]>([]);
     const [projects, setProjects] = useState<ProjectListItemOut[]>([]);
-    const [projectMembers, setProjectMembers] = useState<ContributorOut[]>([]);
+    const [projectMembers, setProjectMembers] = useState<Record<string, ContributorOut[]>>({});
     const [search, setSearch] = useState("");
     const [title, setTitle] = useState("");
     const [priority, setPriority] = useState<TaskPriority>("medium");
@@ -49,11 +50,11 @@ function TasksContent() {
             .catch(() => setError("Could not load projects."));
     }, []);
     useEffect(() => {
-        if (!projectId || !canCreateTasks) return;
-        void listProjectMembers(projectId)
-            .then(setProjectMembers)
+        if (!canAssignTasks || projects.length === 0) return;
+        void Promise.all(projects.map(async (project) => [project.id, await listProjectMembers(project.id)] as const))
+            .then((entries) => setProjectMembers(Object.fromEntries(entries)))
             .catch(() => setError("Could not load project members."));
-    }, [projectId, canCreateTasks]);
+    }, [projects, canAssignTasks]);
     async function addTask(event: React.FormEvent) {
         event.preventDefault();
         if (!title.trim()) return;
@@ -148,7 +149,6 @@ function TasksContent() {
                             onChange={(event) => {
                                 setProjectId(event.target.value);
                                 setAssigneeId("");
-                                setProjectMembers([]);
                             }}
                             className="min-w-48 rounded-lg border border-outline-variant px-3 py-2 text-sm"
                         >
@@ -184,7 +184,7 @@ function TasksContent() {
                             className="min-w-48 rounded-lg border border-outline-variant px-3 py-2 text-sm disabled:opacity-50"
                         >
                             <option value="">Unassigned</option>
-                            {projectMembers.map((member) => (
+                            {canAssignTasks && (projectMembers[projectId] || []).map((member) => (
                                 <option key={member.user_id} value={member.user_id}>{member.full_name || member.email}</option>
                             ))}
                         </select>
@@ -266,6 +266,30 @@ function TasksContent() {
                                                     </span>
                                                 )}
                                             </div>
+                                            {canCreateTasks && canAssignTasks && task.project_id && (
+                                                <label className="mt-3 flex items-center gap-2 text-xs text-on-surface-variant">
+                                                    Assign to
+                                                    <select
+                                                        aria-label={`Assign ${task.title}`}
+                                                        value={task.assignee?.id || ""}
+                                                        onChange={async (event) => {
+                                                            const assigneeId = event.target.value || null;
+                                                            try {
+                                                                const updated = await updateTask(task.id, { assignee_id: assigneeId });
+                                                                setTasks((current) => current.map((item) => item.id === updated.id ? updated : item));
+                                                            } catch {
+                                                                setError("Could not update task assignment.");
+                                                            }
+                                                        }}
+                                                        className="rounded-lg border border-outline-variant bg-surface-container-lowest px-2 py-1"
+                                                    >
+                                                        <option value="">Unassigned</option>
+                                                        {(projectMembers[task.project_id] || []).map((member) => (
+                                                            <option key={member.user_id} value={member.user_id}>{member.full_name || member.email}</option>
+                                                        ))}
+                                                    </select>
+                                                </label>
+                                            )}
                                             {canMoveTask(task) && <div className="mt-3 flex gap-2">
                                                 {column.status !== "backlog" && (
                                                     <button

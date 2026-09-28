@@ -46,8 +46,8 @@ export function updateTask(
     status: TaskStatus;
     priority: TaskPriority;
     due_date: string;
-    assignee_id: string;
-    reviewer_id: string;
+    assignee_id: string | null;
+    reviewer_id: string | null;
   }>,
 ): Promise<Task> {
   return authedFetch(`/tasks/${id}`, {
