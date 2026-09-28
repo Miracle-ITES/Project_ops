@@ -254,7 +254,7 @@ function ProjectsContent() {
 
 export default function ProjectsPage() {
   return (
-    <RequireAuth permission="projects:view">
+    <RequireAuth anyPermissions={["projects:view", "projects:view_assigned"]}>
       <ProjectsContent />
     </RequireAuth>
   );

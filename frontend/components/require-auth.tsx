@@ -7,11 +7,14 @@ import { useAuth } from "@/lib/auth-context";
 interface RequireAuthProps {
   children: ReactNode;
   permission?: string;
+  anyPermissions?: string[];
 }
 
-export function RequireAuth({ children, permission }: RequireAuthProps) {
+export function RequireAuth({ children, permission, anyPermissions }: RequireAuthProps) {
   const { user, isLoading, hasPermission } = useAuth();
   const router = useRouter();
+  const allowed = (!permission || hasPermission(permission))
+    && (!anyPermissions || anyPermissions.some(hasPermission));
 
   useEffect(() => {
     if (isLoading) return;
@@ -19,13 +22,13 @@ export function RequireAuth({ children, permission }: RequireAuthProps) {
       router.replace("/login");
       return;
     }
-    if (permission && !hasPermission(permission)) {
+    if (!allowed) {
       router.replace("/");
     }
-  }, [isLoading, user, permission, hasPermission, router]);
+  }, [isLoading, user, allowed, router]);
 
   if (isLoading || !user) return null;
-  if (permission && !hasPermission(permission)) return null;
+  if (!allowed) return null;
 
   return <>{children}</>;
 }

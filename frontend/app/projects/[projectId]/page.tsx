@@ -343,7 +343,7 @@ function ProjectDetailContent() {
 
 export default function ProjectDetailPage() {
   return (
-    <RequireAuth permission="projects:view">
+    <RequireAuth anyPermissions={["projects:view", "projects:view_assigned"]}>
       <ProjectDetailContent />
     </RequireAuth>
   );

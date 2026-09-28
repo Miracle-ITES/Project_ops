@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { AppShell } from "@/components/app-shell";
 import { RequireAuth } from "@/components/require-auth";
 import { useAuth } from "@/lib/auth-context";
@@ -8,29 +8,55 @@ import { createLearning, listDailyUpdates, listLearning, submitDailyUpdate, upda
 import type { DailyUpdate, LearningItem, LearningStatus } from "@/types/work";
 
 export default function UpdatesPage() {
-    const canManageLearning = useAuth().hasPermission("projects:create");
+    const { hasPermission } = useAuth();
+    const canManageLearning = hasPermission("projects:create");
+    const canViewLearning = hasPermission("projects:view");
     const today = new Date().toISOString().slice(0, 10);
     const [updates, setUpdates] = useState<DailyUpdate[]>([]);
     const [learning, setLearning] = useState<LearningItem[]>([]);
     const [summary, setSummary] = useState("");
+    const [accomplishments, setAccomplishments] = useState("");
+    const [plans, setPlans] = useState("");
+    const [blockers, setBlockers] = useState("");
     const [updateDate, setUpdateDate] = useState(today);
     const [topic, setTopic] = useState("");
     const [sessionDate, setSessionDate] = useState(today);
     const [error, setError] = useState<string | null>(null);
-    const reload = () => Promise.all([listDailyUpdates(), listLearning()])
-        .then(([updatePage, learningPage]) => {
-            setUpdates(updatePage.items); setLearning(learningPage.items);
-        }).catch(
-            () => setError("Could not load updates."));
-    useEffect(() => { void reload(); }, []);
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const reload = useCallback(async () => {
+        try {
+            const updatePage = await listDailyUpdates();
+            setUpdates(updatePage.items);
+            if (canViewLearning) {
+                const learningPage = await listLearning();
+                setLearning(learningPage.items);
+            }
+        } catch {
+            setError("Could not load updates.");
+        }
+    }, [canViewLearning]);
+    useEffect(() => { queueMicrotask(() => void reload()); }, [reload]);
     async function submit(event: React.FormEvent) {
         event.preventDefault();
+        setError(null);
+        setIsSubmitting(true);
         try {
-            await submitDailyUpdate({ update_date: updateDate, summary });
+            await submitDailyUpdate({
+                update_date: updateDate,
+                summary,
+                accomplishments: accomplishments || undefined,
+                plans: plans || undefined,
+                blockers: blockers || undefined,
+            });
             setSummary("");
+            setAccomplishments("");
+            setPlans("");
+            setBlockers("");
             await reload();
         } catch {
             setError("Could not submit update.");
+        } finally {
+            setIsSubmitting(false);
         }
     }
     async function addLearning(event: React.FormEvent) {
@@ -51,17 +77,25 @@ export default function UpdatesPage() {
                 Keep the team aligned and turn knowledge-sharing into visible progress.
             </p>
             {error && <p className="mt-4 rounded-lg bg-error-container px-3 py-2 text-sm text-on-error-container">{error}</p>}
-            <div className="mt-6 grid gap-6 lg:grid-cols-2">
-                <section className="rounded-xl bg-surface-container-lowest p-5 shadow-sm">
-                    <h2 className="font-headline-md font-bold text-on-surface">Submit daily update</h2>
+            <div className={`mt-6 grid gap-6 ${canViewLearning ? "lg:grid-cols-2" : "lg:grid-cols-1"}`}>
+                <section id="daily-status" className="rounded-xl bg-surface-container-lowest p-5 shadow-sm">
+                    <h2 className="font-headline-md font-bold text-on-surface">Submit daily status</h2>
                     <form onSubmit={submit} className="mt-4 space-y-3">
                         <label className="block text-xs font-semibold uppercase tracking-wider text-outline">
                             Update date
                             <input required type="date" value={updateDate} onChange={(event) => setUpdateDate(event.target.value)} className="mt-1 w-full rounded-lg border border-outline-variant px-3 py-2 text-sm" />
                         </label>
-                        <textarea required value={summary} onChange={(event) => setSummary(event.target.value)} placeholder="What moved forward today?" className="min-h-28 w-full rounded-lg border border-outline-variant px-3 py-2 text-sm" />
-                        <button className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-on-primary">
-                            Submit update
+                        <label className="block text-xs font-semibold uppercase tracking-wider text-outline">
+                            Daily summary
+                            <textarea required value={summary} onChange={(event) => setSummary(event.target.value)} placeholder="What moved forward today?" className="mt-1 min-h-36 w-full rounded-lg border border-outline-variant px-3 py-2 text-sm normal-case font-normal" />
+                        </label>
+                        <div className="grid gap-3 md:grid-cols-2">
+                            <label className="block text-xs font-semibold uppercase tracking-wider text-outline">Accomplishments<textarea value={accomplishments} onChange={(event) => setAccomplishments(event.target.value)} placeholder="What did you complete?" className="mt-1 min-h-24 w-full rounded-lg border border-outline-variant px-3 py-2 text-sm normal-case font-normal" /></label>
+                            <label className="block text-xs font-semibold uppercase tracking-wider text-outline">Plans<textarea value={plans} onChange={(event) => setPlans(event.target.value)} placeholder="What will you work on next?" className="mt-1 min-h-24 w-full rounded-lg border border-outline-variant px-3 py-2 text-sm normal-case font-normal" /></label>
+                        </div>
+                        <label className="block text-xs font-semibold uppercase tracking-wider text-outline">Blockers<textarea value={blockers} onChange={(event) => setBlockers(event.target.value)} placeholder="Anything blocked or needing help?" className="mt-1 min-h-24 w-full rounded-lg border border-outline-variant px-3 py-2 text-sm normal-case font-normal" /></label>
+                        <button disabled={isSubmitting} className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-on-primary disabled:opacity-50">
+                            {isSubmitting ? "Submitting..." : "Submit daily status"}
                         </button>
                     </form>
                     <div className="mt-6 space-y-3">{updates.slice(0, 5).map((update) =>
@@ -76,7 +110,7 @@ export default function UpdatesPage() {
                     }
                     </div>
                 </section>
-                <section className="rounded-xl bg-surface-container-lowest p-5 shadow-sm">
+                {canViewLearning && <section className="rounded-xl bg-surface-container-lowest p-5 shadow-sm">
                     <h2 className="font-headline-md font-bold text-on-surface">Learning tracker</h2>
                     {canManageLearning && <form onSubmit={addLearning} className="flex flex-col gap-3 sm:flex-row sm:items-end">
                         <div className="min-w-0 flex-1">
@@ -124,7 +158,7 @@ export default function UpdatesPage() {
                     )
                     }
                     </div>
-                </section>
+                </section>}
             </div>
         </div>
     </AppShell>

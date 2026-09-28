@@ -160,14 +160,17 @@ def _daily_query(db: Session, search: str | None):
 
 
 @router.get("/daily-updates", response_model=DailyUpdatePage)
-def list_daily_updates(search: str | None = None, page: int = Query(1, ge=1), page_size: int = Query(20, ge=1, le=100), db: Session = Depends(get_work_db), _: User = Depends(require_permission("projects:view"))):
+def list_daily_updates(search: str | None = None, page: int = Query(1, ge=1), page_size: int = Query(20, ge=1, le=100), db: Session = Depends(get_work_db), user: User = Depends(require_any_permission("projects:view", "projects:view_assigned", "daily_updates:submit"))):
     query = _daily_query(db, search)
+    permissions = {permission.code for permission in user.role.permissions}
+    if "projects:view" not in permissions and "users:manage" not in permissions:
+        query = query.filter(DailyUpdate.user_id == user.id)
     total = query.count()
     return DailyUpdatePage(items=query.offset((page - 1) * page_size).limit(page_size).all(), meta=_meta(page, page_size, total))
 
 
 @router.post("/daily-updates", response_model=DailyUpdateOut)
-def submit_daily_update(payload: DailyUpdateCreate, db: Session = Depends(get_work_db), user: User = Depends(require_permission("projects:view"))):
+def submit_daily_update(payload: DailyUpdateCreate, db: Session = Depends(get_work_db), user: User = Depends(require_permission("daily_updates:submit"))):
     update = db.query(DailyUpdate).filter_by(user_id=user.id, update_date=payload.update_date).first()
     if update:
         for field, value in payload.model_dump().items():
@@ -220,7 +223,7 @@ def update_learning(item_id: uuid.UUID, payload: LearningUpdate, db: Session = D
 
 
 @router.get("/dashboard", response_model=DashboardOut)
-def dashboard(db: Session = Depends(get_work_db), _: User = Depends(require_permission("projects:view"))):
+def dashboard(db: Session = Depends(get_work_db), _: User = Depends(require_permission("dashboards:view"))):
     today = date.today()
     return DashboardOut(active_projects=db.query(Project).filter(Project.maturity == ProjectMaturity.ACTIVE).count(), tasks_due_today=db.query(Task).filter(Task.due_date == today, Task.status != TaskStatus.COMPLETED).count(), open_blockers=db.query(Blocker).filter(Blocker.status == BlockerStatus.OPEN).count(), completed_tasks=db.query(Task).filter(Task.status == TaskStatus.COMPLETED).count(), task_total=db.query(Task).count(), learning_completed=db.query(LearningItem).filter(LearningItem.status == LearningStatus.COMPLETED).count(), daily_updates_today=db.query(DailyUpdate).filter(DailyUpdate.update_date == today).count())
 

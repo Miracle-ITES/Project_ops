@@ -135,7 +135,7 @@ Authentication endpoints:
 
 Inactive users with valid credentials receive `Access denied by administrator`. Incorrect credentials continue to use the generic login error.
 
-The application uses granular permission codes through `require_permission`, rather than hardcoded role checks.
+The application uses granular permission codes through `require_permission`, rather than hardcoded role checks. Every seeded role has `dashboards:view`; dashboard KPI cards summarize current platform data across users, while the project health list remains scoped to projects visible to the signed-in user. Dashboard values refresh when the page regains focus and every 30 seconds while visible. Members with `projects:view_assigned` can open the Projects section and see projects where they are listed as a contributor or belong to an assigned project team.
 
 | Role           | Capabilities                                                                                                    |
 | -------------- | --------------------------------------------------------------------------------------------------------------- |
@@ -205,8 +205,8 @@ Tasks, daily updates, and learning/KT sessions use live PostgreSQL data. The Tas
 | POST   | `/tasks`                  | Create a project-linked task with priority, due date, assignee, and reviewer |
 | PATCH  | `/tasks/{task_id}`        | Update task details, assignment, or status                            |
 | DELETE | `/tasks/{task_id}`        | Delete a task                                                        |
-| GET    | `/daily-updates`          | Paginated consolidated daily updates                                 |
-| POST   | `/daily-updates`          | Submit or update a dated daily update                                |
+| GET    | `/daily-updates`          | Paginated updates; Members see their own, project viewers see all     |
+| POST   | `/daily-updates`          | `daily_updates:submit`; submit or update your dated daily update      |
 | GET    | `/learning`               | Paginated learning and KT session records                            |
 | POST   | `/learning`               | Create a learning topic or KT session with session date              |
 | PATCH  | `/learning/{item_id}`     | Track learning progress to completion                                |
