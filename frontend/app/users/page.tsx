@@ -114,6 +114,8 @@ function UsersContent() {
     }
 
     const uniqueTeamMembers = Array.from(new Map(teamMembers.map((member) => [member.user_id, member])).values());
+    const pendingRequests = requests.filter((request) => request.status === "pending").length;
+    const approvedRequests = requests.filter((request) => request.status === "approved").length;
 
     return (
         <AppShell active="users" breadcrumb="User Administration">
@@ -121,7 +123,7 @@ function UsersContent() {
                 <div className="mb-space-lg flex flex-col justify-between gap-space-md lg:flex-row lg:items-center">
                     <div>
                         <h1 className="font-headline-xl text-headline-xl font-bold tracking-tight text-on-surface">Users &amp; Access</h1>
-                        <p className="mt-0.5 font-body-md text-body-md text-on-surface-variant">Invite members by email and manage access levels.</p>
+                        <p className="mt-0.5 font-body-md text-body-md text-on-surface-variant">{canManageUsers ? "Invite members by email and manage access levels." : canRequestUsers ? "Request new users for administrator approval and follow your requests and team roster." : "View members and access information for your teams."}</p>
                     </div>
                     {canRequestUsers && <button
                         type="button"
@@ -140,16 +142,16 @@ function UsersContent() {
 
                 <div className="mb-space-lg grid grid-cols-1 gap-space-md sm:grid-cols-3">
                     <div className="rounded-xl bg-surface-container-lowest p-4 shadow-sm">
-                        <span className="font-label-sm text-label-sm font-semibold uppercase tracking-wider text-outline">{canManageUsers ? "Total Users" : canViewTeamRoster ? "Team Users" : "Users Requested"}</span>
+                        <span className="font-label-sm text-label-sm font-semibold uppercase tracking-wider text-outline">{canManageUsers ? "Total Users" : canViewTeamRoster ? "Team Members" : "Users Requested"}</span>
                         <div className="mt-3 font-display-lg text-display-lg font-bold tracking-tight text-on-surface">{isLoading ? "..." : canManageUsers ? users.length : canViewTeamRoster ? uniqueTeamMembers.length : requests.length}</div>
                     </div>
                     <div className="rounded-xl bg-surface-container-lowest p-4 shadow-sm">
-                        <span className="font-label-sm text-label-sm font-semibold uppercase tracking-wider text-outline">{canManageUsers || canViewTeamRoster ? "Active Accounts" : "Approved"}</span>
-                        <div className="mt-3 font-display-lg text-display-lg font-bold tracking-tight text-secondary">{isLoading ? "..." : canManageUsers ? users.filter((user) => user.is_active).length : canViewTeamRoster ? uniqueTeamMembers.filter((member) => member.is_active).length : requests.filter((request) => request.status === "approved").length}</div>
+                        <span className="font-label-sm text-label-sm font-semibold uppercase tracking-wider text-outline">{canManageUsers ? "Active Accounts" : canViewTeamRoster ? "Pending Requests" : "Approved"}</span>
+                        <div className="mt-3 font-display-lg text-display-lg font-bold tracking-tight text-secondary">{isLoading ? "..." : canManageUsers ? users.filter((user) => user.is_active).length : canViewTeamRoster ? pendingRequests : approvedRequests}</div>
                     </div>
                     <div className="rounded-xl bg-surface-container-lowest p-4 shadow-sm">
-                        <span className="font-label-sm text-label-sm font-semibold uppercase tracking-wider text-outline">{canManageUsers || canViewTeamRoster ? "Administrators" : "Pending"}</span>
-                        <div className="mt-3 font-display-lg text-display-lg font-bold tracking-tight text-on-surface">{isLoading ? "..." : canManageUsers ? users.filter((user) => user.role.name === "Administrator").length : canViewTeamRoster ? uniqueTeamMembers.filter((member) => member.role_name === "Administrator").length : requests.filter((request) => request.status === "pending").length}</div>
+                        <span className="font-label-sm text-label-sm font-semibold uppercase tracking-wider text-outline">{canManageUsers ? "Administrators" : canViewTeamRoster ? "Approved Requests" : "Pending"}</span>
+                        <div className="mt-3 font-display-lg text-display-lg font-bold tracking-tight text-on-surface">{isLoading ? "..." : canManageUsers ? users.filter((user) => user.role.name === "Administrator").length : canViewTeamRoster ? approvedRequests : pendingRequests}</div>
                     </div>
                 </div>
 
@@ -175,6 +177,10 @@ function UsersContent() {
                 {canRequestUsers && !canManageUsers && requests.length > 0 && <section className="mb-space-lg rounded-xl bg-surface-container-lowest p-space-md shadow-sm"><h2 className="font-headline-md font-bold text-on-surface">Your user requests</h2><div className="mt-3 space-y-2">{requests.map((request) => <div key={request.id} className="flex items-center justify-between border-t border-outline-variant/40 py-2 text-sm"><span className="text-on-surface">{request.full_name || request.email}</span><span className="text-xs font-semibold capitalize text-on-surface-variant">{request.status}</span></div>)}</div></section>}
 
                 <div className="overflow-x-auto rounded-xl bg-surface-container-lowest p-space-md shadow-sm">
+                    {canViewTeamRoster && <div className="mb-3">
+                        <h2 className="font-headline-md font-bold text-on-surface">Members of your teams</h2>
+                        <p className="mt-1 text-sm text-on-surface-variant">Approved user requests are not added to a team automatically; team membership is managed separately.</p>
+                    </div>}
                     <table className="w-full min-w-180 text-left font-body-md text-body-md">
                         <thead>
                             <tr className="bg-surface-container-low/50 font-label-sm text-label-sm uppercase tracking-wider text-outline">
@@ -206,7 +212,7 @@ function UsersContent() {
                                     <td className="px-3 py-3"><button type="button" onClick={() => void handleActiveChange(user.id, !user.is_active)} className="font-label-sm text-label-sm text-on-surface-variant hover:text-secondary">{user.is_active ? "Deactivate" : "Activate"}</button></td>
                                 </tr>
                             )) : canViewTeamRoster ? teamMembers.length === 0 ? (
-                                <tr><td colSpan={4} className="px-3 py-6 text-on-surface-variant">No users are assigned to your teams yet.</td></tr>
+                                <tr><td colSpan={4} className="px-3 py-6 text-on-surface-variant"><p>No members are listed for your teams yet.</p><p className="mt-1 text-xs">Once a user is added to a team you belong to, they will appear here.</p><Link href="/teams" className="mt-2 inline-block text-sm font-semibold text-secondary hover:underline">View teams</Link></td></tr>
                             ) : teamMembers.map((member) => (
                                 <tr key={member.user_id} className="border-t border-outline-variant/40">
                                     <td className="px-3 py-3"><span className="block font-semibold text-on-surface">{member.full_name || member.email}</span><span className="block text-xs text-on-surface-variant">{member.email}</span></td>

@@ -70,6 +70,9 @@ class ProjectService:
     def is_project_member(self, project_id: uuid.UUID, user_id: uuid.UUID) -> bool:
         return self.projects.is_project_member(project_id, user_id)
 
+    def is_assigned_to_user(self, project_id: uuid.UUID, user_id: uuid.UUID) -> bool:
+        return self.projects.is_assigned_to_user(project_id, user_id)
+
     def update_project(
         self, project_id: uuid.UUID, *, name: str | None = None, description: str | None = None,
         priority: ProjectPriority | None = None, maturity: ProjectMaturity | None = None, user: User,

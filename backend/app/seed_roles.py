@@ -51,13 +51,13 @@ ROLE_DEFINITIONS = {
     },
     "Lead/Manager": {
         "description": (
-            "Create projects/tasks, assign work, review work, manage "
+            "Create projects and teams, manage team membership, assign work, review work, manage "
             "blockers, learning and KT. Cannot change platform-level "
             "security settings unless separately granted."
         ),
         "permissions": {
             "projects:create", "tasks:assign", "work:review", "blockers:raise", "blockers:manage",
-            "users:request", "teams:view_own_roster",
+            "users:request", "teams:view_own_roster", "teams:manage",
             "project_teams:manage",
             "learning_kt:manage", "work:view_assigned", "status:update",
             "daily_updates:submit", "dashboards:view", "projects:view", "reports:view",
@@ -100,8 +100,6 @@ def seed():
                 db.add(role)
                 db.flush()
 
-            if role_name == "Lead/Manager":
-                role.permissions = [permission for permission in role.permissions if permission.code != "teams:manage"]
             existing_codes = {p.code for p in role.permissions}
             for code in definition["permissions"] - existing_codes:
                 role.permissions.append(code_to_permission[code])

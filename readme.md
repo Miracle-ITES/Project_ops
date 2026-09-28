@@ -102,7 +102,7 @@ The frontend currently includes:
 | `/users/{user_id}`       | User profile and administrator access management                |
 | `/profile`               | Signed-in user's company profile                                |
 | `/teams`                 | Team directory; Leads can view, Administrators can manage       |
-| `/teams/{team_id}`       | Team roster; membership changes are Administrator-only          |
+| `/teams/{team_id}`       | Team roster; Administrators and Lead/Managers can manage membership |
 | `/projects`              | Project directory and project creation                          |
 | `/projects/{project_id}` | Project health and priority updates, team/contributor assignment, and milestones |
 | `/blockers`              | Raise and resolve project blockers                              |
@@ -141,14 +141,14 @@ The application uses granular permission codes through `require_permission`, rat
 | -------------- | --------------------------------------------------------------------------------------------------------------- |
 | Administrator  | Manage users, teams, projects, roles, and all seeded permissions                                                |
 | Lead/Manager   | Create/manage teams, add existing users, request new users for admin approval, assign work, and manage projects |
-| Member         | View assigned work and project data where permitted, plus the roster of their own teams; cannot create projects |
+| Member         | View assigned projects/tasks, update status on their assigned tasks, submit daily updates, and view their own team roster; cannot create projects |
 | Viewer/Auditor | Read-only dashboard, project, report, and audit access                                                          |
 
 Roles and permissions are defined in `backend/app/seed_roles.py`. The seed command is safe to rerun and preserves manually granted permissions.
 
 ## Phase 3: Users and Teams
 
-Phase 3 adds users, teams, memberships, roster views, and administrator-approved invitation requests. Team browsing is available to users with `projects:view`, `project_teams:manage`, or `teams:manage`; Lead/Manager and Administrator roles can manage teams and memberships.
+Phase 3 adds users, teams, memberships, roster views, and administrator-approved invitation requests. Team browsing is available to users with `projects:view`, `project_teams:manage`, or `teams:manage`; Lead/Manager and Administrator roles can create teams and add or remove team members.
 
 ### Users
 
@@ -183,11 +183,11 @@ Administrator invitations generate a temporary password and send it by email. Le
 
 | Method | Endpoint                             | Description                                                       |
 | ------ | ------------------------------------ | ----------------------------------------------------------------- |
-| POST   | `/teams`                             | Create a team                                                     |
+| POST   | `/teams`                             | Administrator or Lead/Manager creates a team                      |
 | GET    | `/teams`                             | List teams                                                        |
 | GET    | `/teams/assignable`                  | List teams assignable to projects                                 |
-| POST   | `/teams/{team_id}/members`           | Add a user to a team                                              |
-| DELETE | `/teams/{team_id}/members/{user_id}` | Remove a user from a team                                         |
+| POST   | `/teams/{team_id}/members`           | Administrator or Lead/Manager adds a user to a team              |
+| DELETE | `/teams/{team_id}/members/{user_id}` | Administrator or Lead/Manager removes a user from a team         |
 | GET    | `/teams/{team_id}/roster`            | View the team and member roster                                   |
 | GET    | `/teams/mine/members`                | List members of the signed-in user's teams (Lead/Manager, Member) |
 
@@ -336,7 +336,7 @@ Current migration chain:
 - [x] Frontend user administration and team roster pages
 - [x] Administrator email invitations with generated temporary passwords
 - [x] First-login company profile completion and administrator-only edits
-- [x] Lead read-only team and roster access
+- [x] Lead/Manager team and roster access
 - [x] Lead/Manager team and membership management
 - [x] Lead/Manager invitation requests with administrator approval
 

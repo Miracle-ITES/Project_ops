@@ -114,6 +114,9 @@ function TasksContent() {
                         <p className="mt-1 text-on-surface-variant">
                             Drag work across the board as it moves forward.
                         </p>
+                        {!canCreateTasks && canUpdateAssignedTasks && (
+                            <p className="mt-1 text-sm text-on-surface-variant">You can update the status of tasks assigned to you.</p>
+                        )}
                     </div>
                     <div className="flex gap-2">
                         <input
