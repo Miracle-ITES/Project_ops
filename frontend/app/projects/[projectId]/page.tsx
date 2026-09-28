@@ -6,10 +6,10 @@ import { useParams } from "next/navigation";
 import { RequireAuth } from "@/components/require-auth";
 import { AppShell } from "@/components/app-shell";
 import { useAuth } from "@/lib/auth-context";
-import { addContributor, addMilestone, addTeam, getProject, listProjectMembers, removeTeam } from "@/lib/projects-api";
+import { addContributor, addMilestone, addTeam, getProject, listProjectMembers, removeTeam, updateProject } from "@/lib/projects-api";
 import { listAssignableTeams } from "@/lib/teams-api";
 import { ApiError } from "@/lib/api-client";
-import type { ProjectDetailOut, ProjectMaturity } from "@/types/projects";
+import type { ProjectDetailOut, ProjectMaturity, ProjectPriority } from "@/types/projects";
 import type { TeamOut } from "@/types/teams";
 import type { ContributorOut } from "@/types/projects";
 
@@ -37,6 +37,8 @@ function ProjectDetailContent() {
   const [milestoneName, setMilestoneName] = useState("");
   const [milestoneDueDate, setMilestoneDueDate] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [priority, setPriority] = useState<ProjectPriority>("medium");
+  const [maturity, setMaturity] = useState<ProjectMaturity>("planning");
 
   const load = useCallback(async () => {
     try {
@@ -49,6 +51,8 @@ function ProjectDetailContent() {
         canManageTeams ? listAssignableTeams() : Promise.resolve([]),
       ]);
       setProject(projectData);
+      setPriority(projectData.priority);
+      setMaturity(projectData.maturity);
       setAllUsers(usersData);
       setAllTeams(teamsData);
     } catch (err) {
@@ -129,6 +133,20 @@ function ProjectDetailContent() {
     }
   }
 
+  const handleProjectHealthUpdate: SubmitEventHandler<HTMLFormElement> = async (e) => {
+    e.preventDefault();
+    setError(null);
+    setIsSubmitting(true);
+    try {
+      const updated = await updateProject(projectId, { priority, maturity });
+      setProject(updated);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Failed to update project health and priority.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
   if (!project) {
     return (
       <AppShell active="projects" breadcrumb={error ? "Unable to load project" : "Loading..."}>
@@ -175,6 +193,37 @@ function ProjectDetailContent() {
         )}
 
         {error && <p className="mb-4 rounded-lg bg-error-container px-3 py-2 text-sm text-on-error-container">{error}</p>}
+
+        {canManage && (
+          <section className="mb-6 rounded-xl bg-surface-container-lowest p-space-md shadow-sm">
+            <h2 className="font-headline-md text-headline-md font-bold text-on-surface">Project health and priority</h2>
+            <p className="mt-1 text-sm text-on-surface-variant">Update these values as the project changes.</p>
+            <form onSubmit={handleProjectHealthUpdate} className="mt-4 flex flex-wrap items-end gap-3">
+              <label className="grid gap-1 text-sm font-medium text-on-surface">
+                Health
+                <select value={maturity} onChange={(e) => setMaturity(e.target.value as ProjectMaturity)} className="min-w-44 rounded-lg border border-outline-variant px-3 py-2 text-sm">
+                  <option value="planning">Planning</option>
+                  <option value="active">Healthy / Active</option>
+                  <option value="at_risk">At risk</option>
+                  <option value="blocked">Blocked</option>
+                  <option value="completed">Completed</option>
+                </select>
+              </label>
+              <label className="grid gap-1 text-sm font-medium text-on-surface">
+                Priority
+                <select value={priority} onChange={(e) => setPriority(e.target.value as ProjectPriority)} className="min-w-44 rounded-lg border border-outline-variant px-3 py-2 text-sm">
+                  <option value="low">Low</option>
+                  <option value="medium">Medium</option>
+                  <option value="high">High</option>
+                  <option value="critical">Critical</option>
+                </select>
+              </label>
+              <button type="submit" disabled={isSubmitting || (priority === project.priority && maturity === project.maturity)} className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-on-primary disabled:opacity-50">
+                {isSubmitting ? "Saving..." : "Save changes"}
+              </button>
+            </form>
+          </section>
+        )}
 
         <section className="mb-6 rounded-xl bg-surface-container-lowest p-space-md shadow-sm">
           <div className="mb-3 flex items-center justify-between gap-3">

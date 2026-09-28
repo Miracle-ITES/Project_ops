@@ -56,7 +56,7 @@ ROLE_DEFINITIONS = {
             "security settings unless separately granted."
         ),
         "permissions": {
-            "projects:create", "tasks:assign", "work:review", "blockers:manage",
+            "projects:create", "tasks:assign", "work:review", "blockers:raise", "blockers:manage",
             "users:request", "teams:view_own_roster",
             "project_teams:manage",
             "learning_kt:manage", "work:view_assigned", "status:update",

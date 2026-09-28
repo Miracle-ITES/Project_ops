@@ -104,7 +104,7 @@ The frontend currently includes:
 | `/teams`                 | Team directory; Leads can view, Administrators can manage       |
 | `/teams/{team_id}`       | Team roster; membership changes are Administrator-only          |
 | `/projects`              | Project directory and project creation                          |
-| `/projects/{project_id}` | Project details, team/contributor assignment, and milestones    |
+| `/projects/{project_id}` | Project health and priority updates, team/contributor assignment, and milestones |
 | `/blockers`              | Raise and resolve project blockers                              |
 | `/activity`              | Recent authentication and administrative activity               |
 | `/tasks`                 | Project-linked Kanban board with task assignment and status updates |
@@ -226,7 +226,7 @@ Phase 4 adds projects, contributors, milestones, and project-team assignment. Pr
 | POST   | `/projects`                              | `projects:create`      | Create a project; `owner_id` defaults to the caller |
 | GET    | `/projects`                              | `projects:view` or `projects:view_assigned` | List projects in the caller's visibility scope |
 | GET    | `/projects/{project_id}`                 | `projects:view` or `projects:view_assigned` | Get visible project details, contributors, and milestones |
-| PATCH  | `/projects/{project_id}`                 | `projects:create`      | Update project metadata                             |
+| PATCH  | `/projects/{project_id}`                 | `projects:create`      | Update project metadata, health/maturity, and priority |
 | POST   | `/projects/{project_id}/contributors`    | `projects:create`      | Add a contributor                                   |
 | POST   | `/projects/{project_id}/milestones`      | `projects:create`      | Add a milestone                                     |
 | POST   | `/projects/{project_id}/teams`           | `project_teams:manage` | Assign a team to a project                          |
@@ -241,8 +241,11 @@ Blockers are linked to projects and can be raised by users with `blockers:raise`
 | Method | Endpoint                        | Permission        | Description                 |
 | ------ | ------------------------------- | ----------------- | --------------------------- |
 | GET    | `/blockers`                     | `projects:view`   | List project blockers       |
-| POST   | `/blockers`                     | `blockers:raise`  | Raise a project blocker     |
+| POST   | `/blockers`                     | `blockers:raise`  | Raise a blocker on a visible project; optionally assign a project member |
+| PATCH  | `/blockers/{blocker_id}/assignee` | `tasks:assign` | Assign or unassign a project member |
 | PATCH  | `/blockers/{blocker_id}/status` | `blockers:manage` | Resolve or reopen a blocker |
+
+Lead/Manager and Member roles can raise blockers; assignments can be changed by users with `tasks:assign` and must target a member of that project. Blocker lists follow the caller's project visibility scope. Run `alembic upgrade head` and `python -m app.seed_roles` after upgrading so the assignee column and permissions are applied.
 | GET    | `/activity`                     | `audit:view`      | List recent audit activity  |
 
 Example project request:
@@ -302,6 +305,7 @@ Current migration chain:
             └── 0008_invitation_requests
           └── 0009_indexes_for_lists
             └── 0010_task_project_scope
+              └── 0011_blocker_assignment
 ```
 
 ## Implementation Status

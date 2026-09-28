@@ -162,8 +162,12 @@ class Blocker(Base):
     raised_by_id: Mapped[uuid.UUID] = mapped_column(
         PGUUID(as_uuid=True), ForeignKey("users.id"), nullable=False, index=True
     )
+    assignee_id: Mapped[uuid.UUID | None] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("users.id"), nullable=True, index=True
+    )
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
     resolved_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
     project: Mapped["Project"] = relationship(back_populates="blockers")
-    raised_by: Mapped["User"] = relationship()
+    raised_by: Mapped["User"] = relationship(foreign_keys=[raised_by_id])
+    assignee: Mapped["User | None"] = relationship(foreign_keys=[assignee_id])

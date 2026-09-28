@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { RequireAuth } from "@/components/require-auth";
 import { AppShell } from "@/components/app-shell";
 import { useAuth } from "@/lib/auth-context";
@@ -22,18 +22,39 @@ function DashboardContent() {
   const [projects, setProjects] = useState<ProjectListItemOut[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [metrics, setMetrics] = useState<Dashboard | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
+
+  const refreshDashboard = useCallback(async () => {
+    const [projectResult, metricsResult] = await Promise.allSettled([listProjects(), getDashboard()]);
+    if (projectResult.status === "fulfilled") setProjects(projectResult.value);
+    if (metricsResult.status === "fulfilled") setMetrics(metricsResult.value);
+    setLoadError(projectResult.status === "rejected" || metricsResult.status === "rejected"
+      ? "Some dashboard data could not be refreshed. Please try again."
+      : null);
+    setIsLoading(false);
+  }, []);
 
   useEffect(() => {
-    Promise.all([listProjects(), getDashboard()])
-      .then(([projectItems, dashboardMetrics]) => { setProjects(projectItems); setMetrics(dashboardMetrics); })
-      .finally(() => setIsLoading(false));
-  }, []);
+    queueMicrotask(() => void refreshDashboard());
+    const refreshIfVisible = () => {
+      if (document.visibilityState === "visible") void refreshDashboard();
+    };
+    const interval = window.setInterval(refreshIfVisible, 30_000);
+    window.addEventListener("focus", refreshIfVisible);
+    document.addEventListener("visibilitychange", refreshIfVisible);
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener("focus", refreshIfVisible);
+      document.removeEventListener("visibilitychange", refreshIfVisible);
+    };
+  }, [refreshDashboard]);
 
   const firstName = (user?.full_name || user?.email || "").split(/[\s@]/)[0];
 
   return (
     <AppShell active="dashboard" breadcrumb="Executive Overview">
       <div className="px-gutter-lg py-space-lg">
+        {loadError && <p role="alert" className="mb-4 rounded-lg bg-error-container px-3 py-2 text-sm text-on-error-container">{loadError}</p>}
         {/* Header row */}
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-space-md mb-space-lg">
           <div>

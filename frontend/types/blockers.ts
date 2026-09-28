@@ -9,6 +9,8 @@ export interface BlockerOut {
   status: BlockerStatus;
   raised_by_id: string;
   raised_by_email: string;
+  assignee_id: string | null;
+  assignee_email: string | null;
   created_at: string;
   resolved_at: string | null;
 }

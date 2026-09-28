@@ -19,12 +19,18 @@ class BlockerService:
     def list_blockers(self) -> list[Blocker]:
         return self.blockers.list_all()
 
-    def create_blocker(self, *, project_id: uuid.UUID, title: str, description: str | None, raised_by_id: uuid.UUID) -> Blocker:
+    def create_blocker(self, *, project_id: uuid.UUID, title: str, description: str | None, raised_by_id: uuid.UUID, assignee_id: uuid.UUID | None = None) -> Blocker:
         if self.projects.get_by_id(project_id) is None:
             raise BlockerServiceError("Project not found")
         return self.blockers.create(
-            project_id=project_id, title=title, description=description, raised_by_id=raised_by_id,
+            project_id=project_id, title=title, description=description, raised_by_id=raised_by_id, assignee_id=assignee_id,
         )
+
+    def update_assignee(self, blocker_id: uuid.UUID, assignee_id: uuid.UUID | None) -> Blocker:
+        blocker = self.blockers.get_by_id(blocker_id)
+        if blocker is None:
+            raise BlockerServiceError("Blocker not found")
+        return self.blockers.update_assignee(blocker, assignee_id)
 
     def update_status(self, blocker_id: uuid.UUID, status: BlockerStatus) -> Blocker:
         blocker = self.blockers.get_by_id(blocker_id)
