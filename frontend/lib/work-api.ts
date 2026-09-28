@@ -28,6 +28,7 @@ export function createTask(payload: {
   description?: string;
   priority: TaskPriority;
   due_date?: string;
+  project_id: string;
   assignee_id?: string;
   reviewer_id?: string;
 }): Promise<Task> {

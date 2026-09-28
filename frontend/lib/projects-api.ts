@@ -1,6 +1,7 @@
 import { authedFetch } from "./api-client";
 import type {
   MilestoneStatus,
+  ContributorOut,
   ProjectDetailOut,
   ProjectListItemOut,
   ProjectMaturity,
@@ -13,6 +14,12 @@ export function listProjects(): Promise<ProjectListItemOut[]> {
 
 export function getProject(projectId: string): Promise<ProjectDetailOut> {
   return authedFetch<ProjectDetailOut>(`/projects/${projectId}`);
+}
+
+export function listProjectMembers(
+  projectId: string,
+): Promise<ContributorOut[]> {
+  return authedFetch<ContributorOut[]>(`/projects/${projectId}/members`);
 }
 
 export function createProject(payload: {

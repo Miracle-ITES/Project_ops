@@ -46,3 +46,6 @@ class TeamService:
     def get_roster(self, team_id: uuid.UUID) -> tuple[Team, list[TeamMembership]]:
         team = self.get_team(team_id)
         return team, self.teams.get_roster(team_id)
+
+    def get_members_in_user_teams(self, user_id: uuid.UUID) -> list[TeamMembership]:
+        return self.teams.get_members_in_user_teams(user_id)

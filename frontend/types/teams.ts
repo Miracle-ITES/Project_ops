@@ -17,3 +17,12 @@ export interface TeamRosterOut {
   team: TeamOut;
   members: RosterMemberOut[];
 }
+
+export interface MyTeamMemberOut {
+  user_id: string;
+  email: string;
+  full_name: string | null;
+  role_name: string;
+  is_active: boolean;
+  team_names: string[];
+}

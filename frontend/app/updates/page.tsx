@@ -3,10 +3,12 @@
 import { useEffect, useState } from "react";
 import { AppShell } from "@/components/app-shell";
 import { RequireAuth } from "@/components/require-auth";
+import { useAuth } from "@/lib/auth-context";
 import { createLearning, listDailyUpdates, listLearning, submitDailyUpdate, updateLearning } from "@/lib/work-api";
 import type { DailyUpdate, LearningItem, LearningStatus } from "@/types/work";
 
 export default function UpdatesPage() {
+    const canManageLearning = useAuth().hasPermission("projects:create");
     const today = new Date().toISOString().slice(0, 10);
     const [updates, setUpdates] = useState<DailyUpdate[]>([]);
     const [learning, setLearning] = useState<LearningItem[]>([]);
@@ -76,7 +78,7 @@ export default function UpdatesPage() {
                 </section>
                 <section className="rounded-xl bg-surface-container-lowest p-5 shadow-sm">
                     <h2 className="font-headline-md font-bold text-on-surface">Learning tracker</h2>
-                    <form onSubmit={addLearning} className="flex flex-col gap-3 sm:flex-row sm:items-end">
+                    {canManageLearning && <form onSubmit={addLearning} className="flex flex-col gap-3 sm:flex-row sm:items-end">
                         <div className="min-w-0 flex-1">
 
 
@@ -107,17 +109,17 @@ export default function UpdatesPage() {
                         >
                             Add
                         </button>
-                    </form>
+                    </form>}
                     <div className="mt-5 space-y-3">{learning.map((item) => <div key={item.id} className="flex items-center justify-between gap-3 border-t border-outline-variant/40 pt-3">
                         <div>
                             <p className="font-semibold text-on-surface">{item.topic}</p>
                             <p className="text-xs text-outline">{item.owner.full_name || item.owner.email}{item.session_date ? ` · ${item.session_date}` : ""}</p>
                         </div>
-                        <select value={item.status} onChange={(event) => updateLearning(item.id, event.target.value as LearningStatus).then(reload)} className="rounded-lg border border-outline-variant px-2 py-1 text-xs">
+                        {canManageLearning ? <select value={item.status} onChange={(event) => updateLearning(item.id, event.target.value as LearningStatus).then(reload)} className="rounded-lg border border-outline-variant px-2 py-1 text-xs">
                             <option value="planned">Planned</option>
                             <option value="in_progress">In progress</option>
                             <option value="completed">Completed</option>
-                        </select>
+                        </select> : <span className="text-xs capitalize text-on-surface-variant">{item.status.replace("_", " ")}</span>}
                     </div>
                     )
                     }

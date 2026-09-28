@@ -15,6 +15,7 @@ class TaskCreate(BaseModel):
     status: TaskStatus = TaskStatus.BACKLOG
     priority: TaskPriority = TaskPriority.MEDIUM
     due_date: date | None = None
+    project_id: uuid.UUID
     assignee_id: uuid.UUID | None = None
     reviewer_id: uuid.UUID | None = None
 
@@ -34,6 +35,7 @@ class TaskOut(BaseModel):
     status: TaskStatus
     priority: TaskPriority
     due_date: date | None
+    project_id: uuid.UUID | None
     assignee: UserBrief | None
     reviewer: UserBrief | None
     created_by: UserBrief

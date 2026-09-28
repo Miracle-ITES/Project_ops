@@ -6,13 +6,12 @@ import { useParams } from "next/navigation";
 import { RequireAuth } from "@/components/require-auth";
 import { AppShell } from "@/components/app-shell";
 import { useAuth } from "@/lib/auth-context";
-import { addContributor, addMilestone, addTeam, getProject, removeTeam } from "@/lib/projects-api";
+import { addContributor, addMilestone, addTeam, getProject, listProjectMembers, removeTeam } from "@/lib/projects-api";
 import { listAssignableTeams } from "@/lib/teams-api";
-import { listAssignableUsers } from "@/lib/users-api";
 import { ApiError } from "@/lib/api-client";
 import type { ProjectDetailOut, ProjectMaturity } from "@/types/projects";
 import type { TeamOut } from "@/types/teams";
-import type { UserListItemOut } from "@/types/users";
+import type { ContributorOut } from "@/types/projects";
 
 const HEALTH_BADGE: Record<ProjectMaturity, { text: string; dot: string; className: string }> = {
   planning: { text: "Planning", dot: "bg-outline", className: "bg-surface-container-high text-on-surface-variant" },
@@ -29,7 +28,7 @@ function ProjectDetailContent() {
   const canManageTeams = hasPermission("project_teams:manage");
 
   const [project, setProject] = useState<ProjectDetailOut | null>(null);
-  const [allUsers, setAllUsers] = useState<UserListItemOut[]>([]);
+  const [allUsers, setAllUsers] = useState<ContributorOut[]>([]);
   const [allTeams, setAllTeams] = useState<TeamOut[]>([]);
   const [error, setError] = useState<string | null>(null);
 
@@ -41,9 +40,9 @@ function ProjectDetailContent() {
 
   const load = useCallback(async () => {
     try {
-      const requests: [Promise<ProjectDetailOut>, Promise<UserListItemOut[]>] = [
+      const requests: [Promise<ProjectDetailOut>, Promise<ContributorOut[]>] = [
         getProject(projectId),
-        canManage ? listAssignableUsers() : Promise.resolve([]),
+        canManage ? listProjectMembers(projectId) : Promise.resolve([]),
       ];
       const [projectData, usersData, teamsData] = await Promise.all([
         ...requests,
@@ -144,7 +143,7 @@ function ProjectDetailContent() {
 
   const badge = HEALTH_BADGE[project.maturity];
   const contributorIds = new Set(project.contributors.map((c) => c.user_id));
-  const availableUsers = allUsers.filter((u) => u.id !== project.owner.id && !contributorIds.has(u.id));
+  const availableUsers = allUsers.filter((u) => u.user_id !== project.owner.id && !contributorIds.has(u.user_id));
   const assignedTeamIds = new Set(project.teams.map((team) => team.team_id));
   const availableTeams = allTeams.filter((team) => !assignedTeamIds.has(team.id));
 
@@ -233,7 +232,7 @@ function ProjectDetailContent() {
               >
                 <option value="">Assign a member...</option>
                 {availableUsers.map((u) => (
-                  <option key={u.id} value={u.id}>{u.email}</option>
+                  <option key={u.user_id} value={u.user_id}>{u.email}</option>
                 ))}
               </select>
               <button

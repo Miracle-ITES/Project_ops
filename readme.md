@@ -141,7 +141,7 @@ The application uses granular permission codes through `require_permission`, rat
 | -------------- | --------------------------------------------------------------------------------------------------------------- |
 | Administrator  | Manage users, teams, projects, roles, and all seeded permissions                                                |
 | Lead/Manager   | Create/manage teams, add existing users, request new users for admin approval, assign work, and manage projects |
-| Member         | View assigned work and project data where permitted; cannot create projects                                     |
+| Member         | View assigned work and project data where permitted, plus the roster of their own teams; cannot create projects |
 | Viewer/Auditor | Read-only dashboard, project, report, and audit access                                                          |
 
 Roles and permissions are defined in `backend/app/seed_roles.py`. The seed command is safe to rerun and preserves manually granted permissions.
@@ -181,14 +181,17 @@ Administrator invitations generate a temporary password and send it by email. Le
 
 ### Teams
 
-| Method | Endpoint                             | Description                       |
-| ------ | ------------------------------------ | --------------------------------- |
-| POST   | `/teams`                             | Create a team                     |
-| GET    | `/teams`                             | List teams                        |
-| GET    | `/teams/assignable`                  | List teams assignable to projects |
-| POST   | `/teams/{team_id}/members`           | Add a user to a team              |
-| DELETE | `/teams/{team_id}/members/{user_id}` | Remove a user from a team         |
-| GET    | `/teams/{team_id}/roster`            | View the team and member roster   |
+| Method | Endpoint                             | Description                                                       |
+| ------ | ------------------------------------ | ----------------------------------------------------------------- |
+| POST   | `/teams`                             | Create a team                                                     |
+| GET    | `/teams`                             | List teams                                                        |
+| GET    | `/teams/assignable`                  | List teams assignable to projects                                 |
+| POST   | `/teams/{team_id}/members`           | Add a user to a team                                              |
+| DELETE | `/teams/{team_id}/members/{user_id}` | Remove a user from a team                                         |
+| GET    | `/teams/{team_id}/roster`            | View the team and member roster                                   |
+| GET    | `/teams/mine/members`                | List members of the signed-in user's teams (Lead/Manager, Member) |
+
+After adding or changing seeded permissions, rerun `python -m app.seed_roles` from `backend/` and refresh the affected user's session.
 
 Team membership is stored in `team_memberships` and enforces one membership per team/user pair.
 

@@ -7,6 +7,7 @@ from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.domain.base import Base
+from app.domain.project import Project
 from app.domain.user import User
 
 
@@ -38,12 +39,14 @@ class Task(Base):
     status: Mapped[TaskStatus] = mapped_column(Enum(TaskStatus, name="task_status", values_callable=lambda e: [x.value for x in e]), default=TaskStatus.BACKLOG, nullable=False, index=True)
     priority: Mapped[TaskPriority] = mapped_column(Enum(TaskPriority, name="task_priority", values_callable=lambda e: [x.value for x in e]), default=TaskPriority.MEDIUM, nullable=False)
     due_date: Mapped[date | None] = mapped_column(Date, nullable=True, index=True)
+    project_id: Mapped[uuid.UUID | None] = mapped_column(PGUUID(as_uuid=True), ForeignKey("projects.id"), nullable=True, index=True)
     assignee_id: Mapped[uuid.UUID | None] = mapped_column(PGUUID(as_uuid=True), ForeignKey("users.id"), nullable=True, index=True)
     reviewer_id: Mapped[uuid.UUID | None] = mapped_column(PGUUID(as_uuid=True), ForeignKey("users.id"), nullable=True, index=True)
     created_by_id: Mapped[uuid.UUID] = mapped_column(PGUUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False, index=True)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
 
+    project: Mapped["Project | None"] = relationship()
     assignee: Mapped["User | None"] = relationship(foreign_keys=[assignee_id])
     reviewer: Mapped["User | None"] = relationship(foreign_keys=[reviewer_id])
     created_by: Mapped["User"] = relationship(foreign_keys=[created_by_id])

@@ -1,5 +1,5 @@
 import { authedFetch } from "./api-client";
-import type { TeamOut, TeamRosterOut } from "@/types/teams";
+import type { MyTeamMemberOut, TeamOut, TeamRosterOut } from "@/types/teams";
 
 export function listTeams(): Promise<TeamOut[]> {
   return authedFetch<TeamOut[]>("/teams");
@@ -22,6 +22,10 @@ export function createTeam(payload: {
 
 export function getRoster(teamId: string): Promise<TeamRosterOut> {
   return authedFetch<TeamRosterOut>(`/teams/${teamId}/roster`);
+}
+
+export function listMyTeamMembers(): Promise<MyTeamMemberOut[]> {
+  return authedFetch<MyTeamMemberOut[]>("/teams/mine/members");
 }
 
 export function addMember(teamId: string, userId: string): Promise<TeamOut> {

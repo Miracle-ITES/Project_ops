@@ -3,7 +3,7 @@ import uuid
 from fastapi import APIRouter, Depends, HTTPException, status
 
 from app.api.deps import get_team_service, require_any_permission, require_permission
-from app.api.schemas.teams import RosterMemberOut, TeamCreateRequest, TeamMemberAddRequest, TeamOut, TeamRosterOut
+from app.api.schemas.teams import MyTeamMemberOut, RosterMemberOut, TeamCreateRequest, TeamMemberAddRequest, TeamOut, TeamRosterOut
 from app.domain.user import User
 from app.services.team_service import TeamError, TeamService
 
@@ -36,6 +36,29 @@ def list_assignable_teams(
     _: User = Depends(require_any_permission("teams:manage", "project_teams:manage")),
 ):
     return team_service.list_teams()
+
+
+@router.get("/mine/members", response_model=list[MyTeamMemberOut])
+def list_my_team_members(
+    team_service: TeamService = Depends(get_team_service),
+    current_user: User = Depends(require_permission("teams:view_own_roster")),
+):
+    memberships = team_service.get_members_in_user_teams(current_user.id)
+    members_by_id = {}
+    for membership in memberships:
+        member = members_by_id.setdefault(membership.user_id, {
+            "user_id": membership.user.id,
+            "email": membership.user.email,
+            "full_name": membership.user.full_name,
+            "role_name": membership.user.role.name,
+            "is_active": membership.user.is_active,
+            "team_names": set(),
+        })
+        member["team_names"].add(membership.team.name)
+    return [
+        MyTeamMemberOut(**{**member, "team_names": sorted(member["team_names"])})
+        for member in members_by_id.values()
+    ]
 
 
 @router.post("/{team_id}/members", response_model=TeamOut, status_code=status.HTTP_201_CREATED)

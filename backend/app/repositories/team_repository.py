@@ -59,3 +59,20 @@ class TeamRepository(BaseRepository):
             .order_by(TeamMembership.joined_at)
             .all()
         )
+
+    def get_members_in_user_teams(self, user_id: uuid.UUID) -> list[TeamMembership]:
+        user_team_ids = (
+            self.db.query(TeamMembership.team_id)
+            .filter(TeamMembership.user_id == user_id)
+            .subquery()
+        )
+        return (
+            self.db.query(TeamMembership)
+            .options(
+                joinedload(TeamMembership.user).joinedload(User.role),
+                joinedload(TeamMembership.team),
+            )
+            .filter(TeamMembership.team_id.in_(user_team_ids))
+            .order_by(TeamMembership.joined_at)
+            .all()
+        )

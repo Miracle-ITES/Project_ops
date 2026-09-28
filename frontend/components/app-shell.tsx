@@ -9,13 +9,13 @@ import { useState, type FormEvent } from "react";
 
 export type NavKey = "dashboard" | "projects" | "tasks" | "updates" | "team" | "users" | "blockers" | "activity";
 
-const NAV_ITEMS: { key: NavKey | "disabled"; label: string; icon: typeof LayoutDashboard; href?: string; permission?: string }[] = [
+const NAV_ITEMS: { key: NavKey | "disabled"; label: string; icon: typeof LayoutDashboard; href?: string; permission?: string; anyPermissions?: string[] }[] = [
   { key: "dashboard", label: "Dashboard", icon: LayoutDashboard, href: "/dashboard" },
   { key: "projects", label: "Projects", icon: FolderOpen, href: "/projects" },
   { key: "tasks", label: "Tasks", icon: CheckSquare, href: "/tasks" },
   { key: "updates", label: "Updates", icon: Sparkles, href: "/updates" },
   { key: "team", label: "Team", icon: UsersRound, href: "/teams" },
-  { key: "users", label: "Users", icon: UserCog, href: "/users", permission: "users:request" },
+  { key: "users", label: "Users", icon: UserCog, href: "/users", anyPermissions: ["users:request", "teams:view_own_roster"] },
   { key: "blockers", label: "Blockers", icon: TriangleAlert, href: "/blockers", permission: "projects:view" },
   { key: "activity", label: "Activity", icon: Activity, href: "/activity", permission: "audit:view" },
   { key: "disabled", label: "AI Assistant", icon: Sparkles },
@@ -108,6 +108,7 @@ export function AppShell({ active, breadcrumb, children }: AppShellProps) {
           <nav className="flex-1 px-space-md space-y-space-xxs overflow-y-auto">
             {NAV_ITEMS.map((item) => {
               if (item.permission && !hasPermission(item.permission)) return null;
+              if (item.anyPermissions && !item.anyPermissions.some(hasPermission)) return null;
               const isActive = item.key === active;
               const Icon = item.icon;
               const className = isActive

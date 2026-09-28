@@ -14,6 +14,7 @@ from app.domain.user import Role
 ALL_PERMISSIONS = {
     "users:manage": "Create, edit, deactivate users",
     "users:request": "Request new users for administrator approval",
+    "teams:view_own_roster": "View members of teams you belong to",
     "teams:manage": "Create and manage teams",
     "projects:manage": "Full CRUD on any project",
     "roles:manage": "Create/edit roles and permission assignments",
@@ -34,6 +35,7 @@ ALL_PERMISSIONS = {
     "blockers:raise": "Raise a blocker",
     "dashboards:view": "View dashboards",
     "projects:view": "View project data (read-only)",
+    "projects:view_assigned": "View projects assigned to the user",
     "reports:view": "View reports",
     "audit:view": "View permitted audit views (read-only)",
 }
@@ -55,7 +57,7 @@ ROLE_DEFINITIONS = {
         ),
         "permissions": {
             "projects:create", "tasks:assign", "work:review", "blockers:manage",
-            "teams:manage", "users:request",
+            "users:request", "teams:view_own_roster",
             "project_teams:manage",
             "learning_kt:manage", "work:view_assigned", "status:update",
             "daily_updates:submit", "dashboards:view", "projects:view", "reports:view",
@@ -69,7 +71,8 @@ ROLE_DEFINITIONS = {
         ),
         "permissions": {
             "work:view_assigned", "status:update", "daily_updates:submit",
-            "learning:submit", "blockers:raise", "dashboards:view",
+            "teams:view_own_roster",
+            "learning:submit", "blockers:raise", "dashboards:view", "projects:view_assigned",
         },
     },
     "Viewer/Auditor": {
@@ -97,6 +100,8 @@ def seed():
                 db.add(role)
                 db.flush()
 
+            if role_name == "Lead/Manager":
+                role.permissions = [permission for permission in role.permissions if permission.code != "teams:manage"]
             existing_codes = {p.code for p in role.permissions}
             for code in definition["permissions"] - existing_codes:
                 role.permissions.append(code_to_permission[code])

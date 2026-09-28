@@ -1,8 +1,11 @@
 import uuid
 
-from sqlalchemy.orm import joinedload
+from sqlalchemy import or_, select
+from sqlalchemy.orm import joinedload, selectinload
 
 from app.domain.project import Milestone, Project, ProjectContributor, ProjectMaturity, ProjectPriority, ProjectTeam
+from app.domain.team import TeamMembership
+from app.domain.user import User
 from app.repositories.base import BaseRepository
 
 
@@ -33,13 +36,62 @@ class ProjectRepository(BaseRepository):
             .first()
         )
 
-    def list_all(self) -> list[Project]:
+    def list_all(self, *, limit: int = 20, offset: int = 0) -> list[Project]:
         return (
             self.db.query(Project)
-            .options(joinedload(Project.owner))
-            .order_by(Project.created_at.desc())
+            .options(selectinload(Project.owner))
+            .order_by(Project.created_at.desc(), Project.id)
+            .limit(limit)
+            .offset(offset)
             .all()
         )
+
+    def list_visible(self, *, user_id: uuid.UUID, scope: str, limit: int, offset: int) -> list[Project]:
+        query = self.db.query(Project).options(selectinload(Project.owner))
+        if scope == "owned":
+            query = query.filter(Project.owner_id == user_id)
+        elif scope == "assigned":
+            user_team_ids = select(TeamMembership.team_id).where(TeamMembership.user_id == user_id)
+            query = query.filter(or_(
+                Project.owner_id == user_id,
+                Project.contributors.any(ProjectContributor.user_id == user_id),
+                Project.teams.any(ProjectTeam.team_id.in_(user_team_ids)),
+            ))
+        elif scope != "all":
+            return []
+        return query.order_by(Project.created_at.desc(), Project.id).limit(limit).offset(offset).all()
+
+    def is_assigned_to_user(self, project_id: uuid.UUID, user_id: uuid.UUID) -> bool:
+        user_team_ids = select(TeamMembership.team_id).where(TeamMembership.user_id == user_id)
+        return self.db.query(Project.id).filter(
+            Project.id == project_id,
+            or_(
+                Project.owner_id == user_id,
+                Project.contributors.any(ProjectContributor.user_id == user_id),
+                Project.teams.any(ProjectTeam.team_id.in_(user_team_ids)),
+            ),
+        ).first() is not None
+
+    def is_project_team_member(self, project_id: uuid.UUID, user_id: uuid.UUID) -> bool:
+        return self.db.query(ProjectTeam.id).join(
+            TeamMembership, TeamMembership.team_id == ProjectTeam.team_id
+        ).filter(ProjectTeam.project_id == project_id, TeamMembership.user_id == user_id).first() is not None
+
+    def list_project_members(self, project_id: uuid.UUID) -> list[User]:
+        project = self.db.query(Project).filter(Project.id == project_id).first()
+        if project is None:
+            return []
+        contributor_ids = select(ProjectContributor.user_id).where(ProjectContributor.project_id == project_id)
+        team_member_ids = select(TeamMembership.user_id).join(
+            ProjectTeam, ProjectTeam.team_id == TeamMembership.team_id
+        ).where(ProjectTeam.project_id == project_id)
+        return self.db.query(User).filter(
+            User.is_active.is_(True),
+            or_(User.id == project.owner_id, User.id.in_(contributor_ids), User.id.in_(team_member_ids)),
+        ).order_by(User.full_name, User.email).all()
+
+    def count_all(self) -> int:
+        return self.db.query(Project).count()
 
     def update(self, project: Project, **fields) -> Project:
         for key, value in fields.items():
@@ -63,6 +115,12 @@ class ProjectRepository(BaseRepository):
             .first()
             is not None
         )
+
+    def is_project_member(self, project_id: uuid.UUID, user_id: uuid.UUID) -> bool:
+        project = self.db.query(Project).filter(Project.id == project_id).first()
+        if project is None:
+            return False
+        return project.owner_id == user_id or self.is_contributor(project_id, user_id) or self.is_project_team_member(project_id, user_id)
 
     def add_team(self, project_id: uuid.UUID, team_id: uuid.UUID) -> ProjectTeam:
         project_team = ProjectTeam(project_id=project_id, team_id=team_id)

@@ -34,3 +34,12 @@ class RosterMemberOut(BaseModel):
 class TeamRosterOut(BaseModel):
     team: TeamOut
     members: list[RosterMemberOut]
+
+
+class MyTeamMemberOut(BaseModel):
+    user_id: uuid.UUID
+    email: EmailStr
+    full_name: str | None
+    role_name: str
+    is_active: bool
+    team_names: list[str]
