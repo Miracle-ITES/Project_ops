@@ -29,6 +29,7 @@ class RosterMemberOut(BaseModel):
     full_name: str | None
     role_name: str
     joined_at: datetime
+    team_count: int
 
 
 class TeamRosterOut(BaseModel):

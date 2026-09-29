@@ -24,6 +24,12 @@ class TeamService:
     def list_teams(self) -> list[Team]:
         return self.teams.list_all()
 
+    def list_user_teams(self, user_id: uuid.UUID) -> list[Team]:
+        return self.teams.list_for_user(user_id)
+
+    def is_member(self, team_id: uuid.UUID, user_id: uuid.UUID) -> bool:
+        return self.teams.is_member(team_id, user_id)
+
     def get_team(self, team_id: uuid.UUID) -> Team:
         team = self.teams.get_by_id(team_id)
         if team is None:
@@ -46,6 +52,9 @@ class TeamService:
     def get_roster(self, team_id: uuid.UUID) -> tuple[Team, list[TeamMembership]]:
         team = self.get_team(team_id)
         return team, self.teams.get_roster(team_id)
+
+    def count_teams_for_users(self, user_ids: list[uuid.UUID]) -> dict[uuid.UUID, int]:
+        return self.teams.count_teams_for_users(user_ids)
 
     def get_members_in_user_teams(self, user_id: uuid.UUID) -> list[TeamMembership]:
         return self.teams.get_members_in_user_teams(user_id)

@@ -1,11 +1,11 @@
 "use client";
 
-import { useEffect, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { Plus, UsersRound } from "lucide-react";
 import { RequireAuth } from "@/components/require-auth";
 import { AppShell } from "@/components/app-shell";
-import { createTeam, listTeams } from "@/lib/teams-api";
+import { createTeam, listMyTeams, listTeams } from "@/lib/teams-api";
 import { ApiError } from "@/lib/api-client";
 import type { TeamOut } from "@/types/teams";
 import { Dialog } from "../../components/dialog";
@@ -14,6 +14,7 @@ import { useAuth } from "@/lib/auth-context";
 function TeamsContent() {
   const { hasPermission } = useAuth();
   const canManageTeams = hasPermission("teams:manage");
+  const canViewAllTeams = canManageTeams || hasPermission("project_teams:manage") || hasPermission("projects:view");
   const [teams, setTeams] = useState<TeamOut[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -22,14 +23,18 @@ function TeamsContent() {
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  async function load() {
+  const load = useCallback(async () => {
     setIsLoading(true);
+    setError(null);
     try {
-      setTeams(await listTeams());
+      setTeams(await (canViewAllTeams ? listTeams() : listMyTeams()));
+    } catch (err) {
+      setTeams([]);
+      setError(err instanceof ApiError ? `Failed to load teams: ${err.message}` : "Failed to load teams.");
     } finally {
       setIsLoading(false);
     }
-  }
+  }, [canViewAllTeams]);
 
   useEffect(() => {
     let cancelled = false;
@@ -40,7 +45,7 @@ function TeamsContent() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [load]);
 
   async function handleCreate(e: FormEvent) {
     e.preventDefault();
@@ -68,7 +73,7 @@ function TeamsContent() {
               Team &amp; Organizational Roster
             </h1>
             <p className="font-body-md text-body-md text-on-surface-variant mt-0.5">
-              Manage teams and their membership.
+            {canViewAllTeams ? "Manage teams and their membership." : "Teams you belong to and their members."}
             </p>
           </div>
           {canManageTeams && <button
@@ -79,6 +84,8 @@ function TeamsContent() {
             Add Team
           </button>}
         </div>
+
+        {error && !showForm && <p className="mb-4 rounded-lg bg-error-container px-3 py-2 text-sm text-on-error-container">{error}</p>}
 
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-space-md mb-space-lg">
           <div className="p-4 rounded-xl bg-surface-container-lowest shadow-sm">
@@ -149,7 +156,7 @@ function TeamsContent() {
 
 export default function TeamsPage() {
   return (
-    <RequireAuth permission="projects:view">
+    <RequireAuth anyPermissions={["projects:view", "teams:manage", "project_teams:manage", "teams:view_own_roster"]}>
       <TeamsContent />
     </RequireAuth>
   );

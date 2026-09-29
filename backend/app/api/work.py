@@ -186,7 +186,7 @@ def submit_daily_update(payload: DailyUpdateCreate, db: Session = Depends(get_wo
 
 
 @router.get("/learning", response_model=LearningPage)
-def list_learning(search: str | None = None, learning_status: LearningStatus | None = Query(default=None, alias="status"), page: int = Query(1, ge=1), page_size: int = Query(20, ge=1, le=100), db: Session = Depends(get_work_db), _: User = Depends(require_permission("projects:view"))):
+def list_learning(search: str | None = None, learning_status: LearningStatus | None = Query(default=None, alias="status"), page: int = Query(1, ge=1), page_size: int = Query(20, ge=1, le=100), db: Session = Depends(get_work_db), _: User = Depends(require_any_permission("projects:view", "projects:view_assigned", "learning:submit"))):
     query = db.query(LearningItem).options(joinedload(LearningItem.owner))
     if search:
         query = query.filter(or_(LearningItem.topic.ilike(f"%{search}%"), LearningItem.notes.ilike(f"%{search}%")))

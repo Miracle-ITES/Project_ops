@@ -14,7 +14,7 @@ depends_on = None
 
 
 def upgrade():
-    task_status = sa.Enum("backlog", "in_progress", "completed", name="task_status")
+    task_status = sa.Enum("to_do", "in_progress", "completed", name="task_status")
     task_priority = sa.Enum("low", "medium", "high", "critical", name="task_priority")
     learning_status = sa.Enum("planned", "in_progress", "completed", name="learning_status")
     task_status.create(op.get_bind(), checkfirst=True)
@@ -22,7 +22,7 @@ def upgrade():
     learning_status.create(op.get_bind(), checkfirst=True)
     # The enum types are created explicitly above; table creation must only
     # reference them, otherwise SQLAlchemy attempts CREATE TYPE a second time.
-    task_status_column = postgresql.ENUM("backlog", "in_progress", "completed", name="task_status", create_type=False)
+    task_status_column = postgresql.ENUM("to_do", "in_progress", "completed", name="task_status", create_type=False)
     task_priority_column = postgresql.ENUM("low", "medium", "high", "critical", name="task_priority", create_type=False)
     learning_status_column = postgresql.ENUM("planned", "in_progress", "completed", name="learning_status", create_type=False)
     op.create_table("tasks", sa.Column("id", sa.UUID(), nullable=False), sa.Column("title", sa.String(200), nullable=False), sa.Column("description", sa.Text()), sa.Column("status", task_status_column, nullable=False), sa.Column("priority", task_priority_column, nullable=False), sa.Column("due_date", sa.Date()), sa.Column("assignee_id", sa.UUID(), sa.ForeignKey("users.id")), sa.Column("reviewer_id", sa.UUID(), sa.ForeignKey("users.id")), sa.Column("created_by_id", sa.UUID(), sa.ForeignKey("users.id"), nullable=False), sa.Column("created_at", sa.DateTime(), nullable=False), sa.Column("updated_at", sa.DateTime(), nullable=False), sa.PrimaryKeyConstraint("id"))

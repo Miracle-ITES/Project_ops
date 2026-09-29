@@ -11,6 +11,7 @@ export interface RosterMemberOut {
   full_name: string | null;
   role_name: string;
   joined_at: string;
+  team_count: number;
 }
 
 export interface TeamRosterOut {

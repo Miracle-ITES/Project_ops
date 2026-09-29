@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { AppShell } from "@/components/app-shell";
 import { RequireAuth } from "@/components/require-auth";
+import { Dialog } from "@/components/dialog";
 import { useAuth } from "@/lib/auth-context";
 import { createLearning, listDailyUpdates, listLearning, submitDailyUpdate, updateLearning } from "@/lib/work-api";
 import type { DailyUpdate, LearningItem, LearningStatus } from "@/types/work";
@@ -10,9 +11,13 @@ import type { DailyUpdate, LearningItem, LearningStatus } from "@/types/work";
 export default function UpdatesPage() {
     const { hasPermission } = useAuth();
     const canManageLearning = hasPermission("projects:create");
-    const canViewLearning = hasPermission("projects:view");
+    const canViewLearning = hasPermission("projects:view")
+        || hasPermission("projects:view_assigned")
+        || hasPermission("learning:submit");
+    const canSubmitUpdates = hasPermission("daily_updates:submit");
     const today = new Date().toISOString().slice(0, 10);
     const [updates, setUpdates] = useState<DailyUpdate[]>([]);
+    const [selectedUpdate, setSelectedUpdate] = useState<DailyUpdate | null>(null);
     const [learning, setLearning] = useState<LearningItem[]>([]);
     const [summary, setSummary] = useState("");
     const [accomplishments, setAccomplishments] = useState("");
@@ -77,10 +82,15 @@ export default function UpdatesPage() {
                 Keep the team aligned and turn knowledge-sharing into visible progress.
             </p>
             {error && <p className="mt-4 rounded-lg bg-error-container px-3 py-2 text-sm text-on-error-container">{error}</p>}
-            <div className={`mt-6 grid gap-6 ${canViewLearning ? "lg:grid-cols-2" : "lg:grid-cols-1"}`}>
-                <section id="daily-status" className="rounded-xl bg-surface-container-lowest p-5 shadow-sm">
-                    <h2 className="font-headline-md font-bold text-on-surface">Submit daily status</h2>
-                    <form onSubmit={submit} className="mt-4 space-y-3">
+            <div className={`mt-6 grid items-stretch gap-6 ${canViewLearning ? "lg:grid-cols-2" : "lg:grid-cols-1"}`}>
+                <section id="daily-status" className="h-full min-w-0 rounded-xl bg-surface-container-lowest p-5 shadow-sm">
+                    <div className="min-h-14">
+                        <h2 className="font-headline-md font-bold text-on-surface">Daily updates</h2>
+                        <p className="mt-1 text-sm text-on-surface-variant">
+                            {canSubmitUpdates ? "Share your progress and keep the team aligned." : "Recent progress shared by the team."}
+                        </p>
+                    </div>
+                    {canSubmitUpdates && <form onSubmit={submit} className="mt-4 space-y-3">
                         <label className="block text-xs font-semibold uppercase tracking-wider text-outline">
                             Update date
                             <input required type="date" value={updateDate} onChange={(event) => setUpdateDate(event.target.value)} className="mt-1 w-full rounded-lg border border-outline-variant px-3 py-2 text-sm" />
@@ -97,21 +107,30 @@ export default function UpdatesPage() {
                         <button disabled={isSubmitting} className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-on-primary disabled:opacity-50">
                             {isSubmitting ? "Submitting..." : "Submit daily status"}
                         </button>
-                    </form>
-                    <div className="mt-6 space-y-3">{updates.slice(0, 5).map((update) =>
-                        <div key={update.id} className="border-t border-outline-variant/40 pt-3">
-                            <div className="flex justify-between text-xs text-outline">
+                    </form>}
+                    <div className={`${canSubmitUpdates ? "mt-6" : "mt-4"} space-y-3`}>{updates.slice(0, 5).map((update) =>
+                        <button
+                            key={update.id}
+                            type="button"
+                            onClick={() => setSelectedUpdate(update)}
+                            className="block w-full border-t border-outline-variant/40 pt-3 text-left hover:bg-surface-container-low/60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                        >
+                            <span className="flex justify-between gap-3 text-xs text-outline">
                                 <span>{update.user.full_name || update.user.email}</span>
-                                <span>{update.update_date}</span>
-                            </div>
-                            <p className="mt-1 text-sm text-on-surface">{update.summary}</p>
-                        </div>
+                                <span className="shrink-0">{update.update_date}</span>
+                            </span>
+                            <span className="mt-1 block text-sm text-on-surface">{update.summary}</span>
+                            <span className="mt-1 block text-xs text-primary">View details</span>
+                        </button>
                     )
                     }
                     </div>
                 </section>
-                {canViewLearning && <section className="rounded-xl bg-surface-container-lowest p-5 shadow-sm">
-                    <h2 className="font-headline-md font-bold text-on-surface">Learning tracker</h2>
+                {canViewLearning && <section className="h-full min-w-0 rounded-xl bg-surface-container-lowest p-5 shadow-sm">
+                    <div className="min-h-14">
+                        <h2 className="font-headline-md font-bold text-on-surface">Learning tracker</h2>
+                        <p className="mt-1 text-sm text-on-surface-variant">Topics and knowledge-sharing sessions.</p>
+                    </div>
                     {canManageLearning && <form onSubmit={addLearning} className="flex flex-col gap-3 sm:flex-row sm:items-end">
                         <div className="min-w-0 flex-1">
 
@@ -160,6 +179,30 @@ export default function UpdatesPage() {
                     </div>
                 </section>}
             </div>
+            {selectedUpdate && <Dialog
+                title={`${selectedUpdate.user.full_name || selectedUpdate.user.email} · ${selectedUpdate.update_date}`}
+                description="Daily status update"
+                onClose={() => setSelectedUpdate(null)}
+            >
+                <div className="max-h-[65vh] space-y-4 overflow-y-auto text-sm">
+                    <div>
+                        <h3 className="font-semibold text-on-surface">Summary</h3>
+                        <p className="mt-1 whitespace-pre-wrap text-on-surface-variant">{selectedUpdate.summary}</p>
+                    </div>
+                    {selectedUpdate.accomplishments && <div>
+                        <h3 className="font-semibold text-on-surface">Accomplishments</h3>
+                        <p className="mt-1 whitespace-pre-wrap text-on-surface-variant">{selectedUpdate.accomplishments}</p>
+                    </div>}
+                    {selectedUpdate.plans && <div>
+                        <h3 className="font-semibold text-on-surface">Plans</h3>
+                        <p className="mt-1 whitespace-pre-wrap text-on-surface-variant">{selectedUpdate.plans}</p>
+                    </div>}
+                    {selectedUpdate.blockers && <div>
+                        <h3 className="font-semibold text-on-surface">Blockers</h3>
+                        <p className="mt-1 whitespace-pre-wrap text-on-surface-variant">{selectedUpdate.blockers}</p>
+                    </div>}
+                </div>
+            </Dialog>}
         </div>
     </AppShell>
     </RequireAuth>;

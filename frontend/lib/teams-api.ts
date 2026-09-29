@@ -5,6 +5,10 @@ export function listTeams(): Promise<TeamOut[]> {
   return authedFetch<TeamOut[]>("/teams");
 }
 
+export function listMyTeams(): Promise<TeamOut[]> {
+  return authedFetch<TeamOut[]>("/teams/mine");
+}
+
 export function listAssignableTeams(): Promise<TeamOut[]> {
   return authedFetch<TeamOut[]>("/teams/assignable");
 }

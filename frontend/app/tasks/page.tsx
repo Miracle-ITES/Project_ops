@@ -11,7 +11,7 @@ import type { ContributorOut, ProjectListItemOut } from "@/types/projects";
 import type { Task, TaskPriority, TaskStatus } from "@/types/work";
 
 const columns: { status: TaskStatus; label: string }[] = [
-    { status: "backlog", label: "Backlog" },
+    { status: "backlog", label: "To Do" },
     { status: "in_progress", label: "In Progress" },
     { status: "completed", label: "Completed" },
 ];
@@ -299,7 +299,7 @@ function TasksContent() {
                                                         onClick={() => void move(task, "backlog")}
                                                         className="text-xs text-on-surface-variant"
                                                     >
-                                                        Backlog
+                                                        To Do
                                                     </button>
                                                 )}
                                                 {column.status !== "in_progress" && (

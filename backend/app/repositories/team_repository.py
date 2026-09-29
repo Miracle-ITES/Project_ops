@@ -1,5 +1,6 @@
 import uuid
 
+from sqlalchemy import func
 from sqlalchemy.orm import joinedload
 
 from app.domain.team import Team, TeamMembership
@@ -23,6 +24,15 @@ class TeamRepository(BaseRepository):
 
     def list_all(self) -> list[Team]:
         return self.db.query(Team).order_by(Team.name).all()
+
+    def list_for_user(self, user_id: uuid.UUID) -> list[Team]:
+        return (
+            self.db.query(Team)
+            .join(TeamMembership, TeamMembership.team_id == Team.id)
+            .filter(TeamMembership.user_id == user_id)
+            .order_by(Team.name)
+            .all()
+        )
 
     def is_member(self, team_id: uuid.UUID, user_id: uuid.UUID) -> bool:
         return (
@@ -59,6 +69,17 @@ class TeamRepository(BaseRepository):
             .order_by(TeamMembership.joined_at)
             .all()
         )
+
+    def count_teams_for_users(self, user_ids: list[uuid.UUID]) -> dict[uuid.UUID, int]:
+        if not user_ids:
+            return {}
+        rows = (
+            self.db.query(TeamMembership.user_id, func.count(TeamMembership.team_id))
+            .filter(TeamMembership.user_id.in_(user_ids))
+            .group_by(TeamMembership.user_id)
+            .all()
+        )
+        return {user_id: count for user_id, count in rows}
 
     def get_members_in_user_teams(self, user_id: uuid.UUID) -> list[TeamMembership]:
         user_team_ids = (

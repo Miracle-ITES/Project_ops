@@ -160,6 +160,9 @@ function RosterContent() {
                   <span className="px-2 py-0.5 rounded-md bg-surface-container-low text-on-surface-variant font-label-sm text-label-sm font-semibold">
                     {member.role_name}
                   </span>
+                  <span className="px-2 py-0.5 rounded-md bg-surface-container-low text-on-surface-variant font-label-sm text-label-sm font-semibold">
+                    {member.team_count} {member.team_count === 1 ? "team" : "teams"}
+                  </span>
                   <span className="font-code-sm text-code-sm text-outline">
                     joined {new Date(member.joined_at).toLocaleDateString()}
                   </span>
@@ -175,7 +178,7 @@ function RosterContent() {
 
 export default function TeamRosterPage() {
   return (
-    <RequireAuth permission="projects:view">
+    <RequireAuth anyPermissions={["projects:view", "teams:manage", "project_teams:manage", "teams:view_own_roster"]}>
       <RosterContent />
     </RequireAuth>
   );
