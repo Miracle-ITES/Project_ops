@@ -46,7 +46,8 @@ def create_project(
     project_service: ProjectService = Depends(get_project_service),
     user: User = Depends(require_permission("projects:create")),
 ):
-    owner_id = payload.owner_id if "users:manage" in {permission.code for permission in user.role.permissions} else user.id
+    is_admin = "users:manage" in {permission.code for permission in user.role.permissions}
+    owner_id = (payload.owner_id or user.id) if is_admin else user.id
     try:
         project = project_service.create_project(
             name=payload.name, description=payload.description, owner_id=owner_id,
