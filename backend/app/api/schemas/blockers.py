@@ -34,3 +34,11 @@ class BlockerOut(BaseModel):
     assignee_email: str | None
     created_at: datetime
     resolved_at: datetime | None
+
+
+class BlockerPage(BaseModel):
+    items: list[BlockerOut]
+    page: int
+    page_size: int
+    total: int
+    pages: int

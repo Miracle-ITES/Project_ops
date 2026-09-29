@@ -1,6 +1,7 @@
 import uuid
 
 from app.domain.project import Blocker, BlockerStatus
+from app.domain.user import User
 from app.repositories.blocker_repository import BlockerRepository
 from app.repositories.project_repository import ProjectRepository
 
@@ -16,8 +17,8 @@ class BlockerService:
         self.blockers = blockers
         self.projects = projects
 
-    def list_blockers(self) -> list[Blocker]:
-        return self.blockers.list_all()
+    def list_blockers(self, user: User, *, offset: int, limit: int) -> tuple[list[Blocker], int]:
+        return self.blockers.list_visible(user, offset=offset, limit=limit)
 
     def create_blocker(self, *, project_id: uuid.UUID, title: str, description: str | None, raised_by_id: uuid.UUID, assignee_id: uuid.UUID | None = None) -> Blocker:
         if self.projects.get_by_id(project_id) is None:

@@ -7,6 +7,7 @@ from app.repositories.audit_repository import AuditLogRepository
 from app.repositories.token_repository import RefreshTokenRepository
 from app.repositories.user_repository import UserRepository
 from app.services.rate_limiter import LoginRateLimiter, RateLimitExceeded
+from starlette.concurrency import run_in_threadpool
 from app.services.security import (
     create_access_token,
     generate_refresh_token,
@@ -73,7 +74,11 @@ class AuthService:
         # Constant-shape failure path: always run a password verification,
         # even against a dummy hash when no user exists, and always raise
         # the same error either way.
-        password_ok = verify_password(password, user.hashed_password if user else DUMMY_HASH)
+        password_ok = await run_in_threadpool(
+            verify_password,
+            password,
+            user.hashed_password if user else DUMMY_HASH,
+        )
 
         if not user or not password_ok:
             try:

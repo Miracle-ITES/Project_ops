@@ -14,3 +14,11 @@ export interface BlockerOut {
   created_at: string;
   resolved_at: string | null;
 }
+
+export interface BlockerPage {
+  items: BlockerOut[];
+  page: number;
+  page_size: number;
+  total: number;
+  pages: number;
+}

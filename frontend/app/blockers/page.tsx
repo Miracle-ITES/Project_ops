@@ -13,6 +13,9 @@ import type { ContributorOut, ProjectListItemOut } from "@/types/projects";
 function BlockersContent() {
     const { hasPermission } = useAuth();
     const [blockers, setBlockers] = useState<BlockerOut[]>([]);
+    const [page, setPage] = useState(1);
+    const [pageCount, setPageCount] = useState(0);
+    const [blockerTotal, setBlockerTotal] = useState(0);
     const [projects, setProjects] = useState<ProjectListItemOut[]>([]);
     const [projectId, setProjectId] = useState("");
     const [assigneeId, setAssigneeId] = useState("");
@@ -23,16 +26,19 @@ function BlockersContent() {
     const [isSubmitting, setIsSubmitting] = useState(false);
     const canAssign = hasPermission("tasks:assign");
 
-    const load = useCallback(async () => {
+    const load = useCallback(async (requestedPage = page) => {
         try {
-            const [blockerData, projectData] = await Promise.all([listBlockers(), listProjects()]);
-            setBlockers(blockerData);
+            const [blockerData, projectData] = await Promise.all([listBlockers(requestedPage), listProjects()]);
+            setBlockers(blockerData.items);
+            setPage(blockerData.page);
+            setPageCount(blockerData.pages);
+            setBlockerTotal(blockerData.total);
             setProjects(projectData);
             if (!projectId && projectData[0]) setProjectId(projectData[0].id);
         } catch (err) {
             setError(err instanceof ApiError ? err.message : "Failed to load blockers.");
         }
-    }, [projectId]);
+    }, [page, projectId]);
 
     useEffect(() => {
         if (!canAssign || projects.length === 0) return;
@@ -61,7 +67,7 @@ function BlockersContent() {
             setTitle("");
             setDescription("");
             setAssigneeId("");
-            await load();
+            await load(1);
         } catch (err) {
             setError(err instanceof ApiError ? err.message : "Failed to raise blocker.");
         } finally {
@@ -115,7 +121,7 @@ function BlockersContent() {
                     </form>
                 )}
                 <div className="space-y-3">
-                    {blockers.length === 0 ? <p className="rounded-xl bg-surface-container-lowest p-6 text-sm text-on-surface-variant">No blockers reported.</p> : blockers.map((blocker) => (
+                    {blockerTotal === 0 ? <p className="rounded-xl bg-surface-container-lowest p-6 text-sm text-on-surface-variant">No blockers reported.</p> : blockers.map((blocker) => (
                         <article key={blocker.id} className="rounded-xl bg-surface-container-lowest p-5 shadow-sm">
                             <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-start">
                                 <div>
@@ -135,6 +141,13 @@ function BlockersContent() {
                         </article>
                     ))}
                 </div>
+                {pageCount > 1 && <div className="mt-5 flex items-center justify-between gap-3 text-sm text-on-surface-variant">
+                    <span>{blockerTotal} blockers · Page {page} of {pageCount}</span>
+                    <div className="flex gap-2">
+                        <button type="button" disabled={page <= 1} onClick={() => setPage((current) => Math.max(1, current - 1))} className="rounded-lg border border-outline-variant px-3 py-1.5 disabled:opacity-50">Previous</button>
+                        <button type="button" disabled={page >= pageCount} onClick={() => setPage((current) => Math.min(pageCount, current + 1))} className="rounded-lg border border-outline-variant px-3 py-1.5 disabled:opacity-50">Next</button>
+                    </div>
+                </div>}
             </div>
         </AppShell>
     );

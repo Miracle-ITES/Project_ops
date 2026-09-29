@@ -1,8 +1,21 @@
 import { authedFetch } from "./api-client";
-import type { BlockerOut, BlockerStatus } from "@/types/blockers";
+import type { BlockerOut, BlockerPage, BlockerStatus } from "@/types/blockers";
 
-export function listBlockers(): Promise<BlockerOut[]> {
-  return authedFetch<BlockerOut[]>("/blockers");
+export function listBlockers(page = 1, pageSize = 50): Promise<BlockerPage> {
+	return authedFetch<BlockerPage | BlockerOut[]>(`/blockers?page=${page}&page_size=${pageSize}`).then((response) => {
+		// Keep the page usable while an already-running backend is still serving
+		// the legacy array response during development/reload.
+		if (Array.isArray(response)) {
+			return {
+				items: response,
+				page: 1,
+				page_size: response.length,
+				total: response.length,
+				pages: response.length ? 1 : 0,
+			};
+		}
+		return response;
+	});
 }
 
 export function createBlocker(payload: {

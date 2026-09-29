@@ -1,9 +1,10 @@
 import uuid
+import math
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 
 from app.api.deps import get_audit_repository, get_blocker_service, get_current_user, get_project_service, require_any_permission, require_permission
-from app.api.schemas.blockers import BlockerAssigneeUpdateRequest, BlockerCreateRequest, BlockerOut, BlockerStatusUpdateRequest
+from app.api.schemas.blockers import BlockerAssigneeUpdateRequest, BlockerCreateRequest, BlockerOut, BlockerPage, BlockerStatusUpdateRequest
 from app.domain.project import Blocker
 from app.domain.user import User
 from app.repositories.audit_repository import AuditLogRepository
@@ -30,20 +31,21 @@ def _to_out(blocker: Blocker) -> BlockerOut:
     )
 
 
-@router.get("", response_model=list[BlockerOut])
+@router.get("", response_model=BlockerPage)
 def list_blockers(
+    page: int = Query(1, ge=1),
+    page_size: int = Query(50, ge=1, le=100),
     service: BlockerService = Depends(get_blocker_service),
-    project_service: ProjectService = Depends(get_project_service),
     user: User = Depends(require_any_permission("projects:view", "projects:view_assigned")),
 ):
-    visible = []
-    for blocker in service.list_blockers():
-        try:
-            project_service.get_visible_project(blocker.project_id, user)
-            visible.append(_to_out(blocker))
-        except ProjectError:
-            continue
-    return visible
+    items, total = service.list_blockers(user, offset=(page - 1) * page_size, limit=page_size)
+    return BlockerPage(
+        items=[_to_out(blocker) for blocker in items],
+        page=page,
+        page_size=page_size,
+        total=total,
+        pages=math.ceil(total / page_size) if total else 0,
+    )
 
 
 @router.post("", response_model=BlockerOut, status_code=status.HTTP_201_CREATED)
