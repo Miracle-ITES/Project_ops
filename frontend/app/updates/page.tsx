@@ -103,7 +103,7 @@ export default function UpdatesPage() {
                             <label className="block text-xs font-semibold uppercase tracking-wider text-outline">Accomplishments<textarea value={accomplishments} onChange={(event) => setAccomplishments(event.target.value)} placeholder="What did you complete?" className="mt-1 min-h-24 w-full rounded-lg border border-outline-variant px-3 py-2 text-sm normal-case font-normal" /></label>
                             <label className="block text-xs font-semibold uppercase tracking-wider text-outline">Plans<textarea value={plans} onChange={(event) => setPlans(event.target.value)} placeholder="What will you work on next?" className="mt-1 min-h-24 w-full rounded-lg border border-outline-variant px-3 py-2 text-sm normal-case font-normal" /></label>
                         </div>
-                        <label className="block text-xs font-semibold uppercase tracking-wider text-outline">Blockers<textarea value={blockers} onChange={(event) => setBlockers(event.target.value)} placeholder="Anything blocked or needing help?" className="mt-1 min-h-24 w-full rounded-lg border border-outline-variant px-3 py-2 text-sm normal-case font-normal" /></label>
+                        <label className="block text-xs font-semibold uppercase tracking-wider text-outline">Tickets<textarea value={blockers} onChange={(event) => setBlockers(event.target.value)} placeholder="Tickets needing attention or help" className="mt-1 min-h-24 w-full rounded-lg border border-outline-variant px-3 py-2 text-sm normal-case font-normal" /></label>
                         <button disabled={isSubmitting} className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-on-primary disabled:opacity-50">
                             {isSubmitting ? "Submitting..." : "Submit daily status"}
                         </button>
@@ -198,7 +198,7 @@ export default function UpdatesPage() {
                         <p className="mt-1 whitespace-pre-wrap text-on-surface-variant">{selectedUpdate.plans}</p>
                     </div>}
                     {selectedUpdate.blockers && <div>
-                        <h3 className="font-semibold text-on-surface">Blockers</h3>
+                        <h3 className="font-semibold text-on-surface">Tickets</h3>
                         <p className="mt-1 whitespace-pre-wrap text-on-surface-variant">{selectedUpdate.blockers}</p>
                     </div>}
                 </div>

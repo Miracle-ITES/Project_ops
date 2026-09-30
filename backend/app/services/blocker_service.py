@@ -30,11 +30,11 @@ class BlockerService:
     def update_assignee(self, blocker_id: uuid.UUID, assignee_id: uuid.UUID | None) -> Blocker:
         blocker = self.blockers.get_by_id(blocker_id)
         if blocker is None:
-            raise BlockerServiceError("Blocker not found")
+            raise BlockerServiceError("Ticket not found")
         return self.blockers.update_assignee(blocker, assignee_id)
 
     def update_status(self, blocker_id: uuid.UUID, status: BlockerStatus) -> Blocker:
         blocker = self.blockers.get_by_id(blocker_id)
         if blocker is None:
-            raise BlockerServiceError("Blocker not found")
+            raise BlockerServiceError("Ticket not found")
         return self.blockers.update_status(blocker, status)

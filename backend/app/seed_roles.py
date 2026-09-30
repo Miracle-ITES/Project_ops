@@ -26,13 +26,13 @@ ALL_PERMISSIONS = {
     "project_teams:manage": "Assign teams to projects",
     "tasks:assign": "Assign work to team members",
     "work:review": "Review submitted work",
-    "blockers:manage": "Manage/resolve reported blockers",
+    "blockers:manage": "Manage/resolve reported tickets",
     "learning_kt:manage": "Manage learning & knowledge-transfer content",
     "work:view_assigned": "View work assigned to self",
     "status:update": "Update status of own tasks",
     "daily_updates:submit": "Submit daily status updates",
     "learning:submit": "Submit learning progress",
-    "blockers:raise": "Raise a blocker",
+    "blockers:raise": "Raise a ticket",
     "dashboards:view": "View dashboards",
     "projects:view": "View project data (read-only)",
     "projects:view_assigned": "View projects assigned to the user",
@@ -52,7 +52,7 @@ ROLE_DEFINITIONS = {
     "Lead/Manager": {
         "description": (
             "Create projects and teams, manage team membership, assign work, review work, manage "
-            "blockers, learning and KT. Cannot change platform-level "
+            "tickets, learning and KT. Cannot change platform-level "
             "security settings unless separately granted."
         ),
         "permissions": {
@@ -66,7 +66,7 @@ ROLE_DEFINITIONS = {
     "Member": {
         "description": (
             "View assigned work, update status, submit daily updates, "
-            "learning progress, raise blockers. Cannot reassign "
+            "learning progress, raise tickets. Cannot reassign "
             "organization-wide ownership or edit restricted projects."
         ),
         "permissions": {

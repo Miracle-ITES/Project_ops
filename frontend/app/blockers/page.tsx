@@ -36,7 +36,7 @@ function BlockersContent() {
             setProjects(projectData);
             if (!projectId && projectData[0]) setProjectId(projectData[0].id);
         } catch (err) {
-            setError(err instanceof ApiError ? err.message : "Failed to load blockers.");
+            setError(err instanceof ApiError ? err.message : "Failed to load tickets.");
         }
     }, [page, projectId]);
 
@@ -69,7 +69,7 @@ function BlockersContent() {
             setAssigneeId("");
             await load(1);
         } catch (err) {
-            setError(err instanceof ApiError ? err.message : "Failed to raise blocker.");
+            setError(err instanceof ApiError ? err.message : "Failed to raise ticket.");
         } finally {
             setIsSubmitting(false);
         }
@@ -81,7 +81,7 @@ function BlockersContent() {
             const updated = await updateBlockerStatus(blockerId, "resolved");
             setBlockers((current) => current.map((blocker) => blocker.id === updated.id ? updated : blocker));
         } catch (err) {
-            setError(err instanceof ApiError ? err.message : "Failed to update blocker.");
+            setError(err instanceof ApiError ? err.message : "Failed to update ticket.");
         }
     }
 
@@ -90,21 +90,21 @@ function BlockersContent() {
             const updated = await assignBlocker(blockerId, nextAssigneeId || null);
             setBlockers((current) => current.map((blocker) => blocker.id === updated.id ? updated : blocker));
         } catch (err) {
-            setError(err instanceof ApiError ? err.message : "Failed to assign blocker.");
+            setError(err instanceof ApiError ? err.message : "Failed to assign ticket.");
         }
     }
 
     return (
-        <AppShell active="blockers" breadcrumb="Blockers">
+        <AppShell active="blockers" breadcrumb="Tickets">
             <div className="max-w-5xl px-gutter-lg py-space-lg">
                 <div className="mb-6">
-                    <h1 className="font-headline-xl text-headline-xl font-bold text-on-surface">Blockers</h1>
+                    <h1 className="font-headline-xl text-headline-xl font-bold text-on-surface">Raise Ticket</h1>
                     <p className="mt-1 font-body-md text-body-md text-on-surface-variant">Raise obstacles against projects and track their resolution.</p>
                 </div>
                 {error && <p className="mb-4 rounded-lg bg-error-container px-3 py-2 text-sm text-on-error-container">{error}</p>}
                 {(hasPermission("blockers:raise") || hasPermission("blockers:manage")) && (
                     <form onSubmit={handleCreate} className="mb-6 rounded-xl bg-surface-container-lowest p-5 shadow-sm">
-                        <h2 className="font-headline-md text-headline-md font-bold text-on-surface">Raise a blocker</h2>
+                        <h2 className="font-headline-md text-headline-md font-bold text-on-surface">Raise a Ticket</h2>
                         <div className="mt-4 grid gap-3 md:grid-cols-2">
                             <select required value={projectId} onChange={(event) => setProjectId(event.target.value)} className="rounded-lg border border-outline-variant px-3 py-2 text-sm focus:border-secondary focus:outline-none">
                                 <option value="">Select project</option>
@@ -114,14 +114,14 @@ function BlockersContent() {
                                 <option value="">Unassigned</option>
                                 {(projectMembers[projectId] || []).map((member) => <option key={member.user_id} value={member.user_id}>{member.full_name || member.email}</option>)}
                             </select>}
-                            <input required value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Blocker title" className="rounded-lg border border-outline-variant px-3 py-2 text-sm focus:border-secondary focus:outline-none" />
+                            <input required value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Ticket title" className="rounded-lg border border-outline-variant px-3 py-2 text-sm focus:border-secondary focus:outline-none" />
                         </div>
-                        <textarea value={description} onChange={(event) => setDescription(event.target.value)} placeholder="What is blocking progress?" rows={3} className="mt-3 w-full rounded-lg border border-outline-variant px-3 py-2 text-sm focus:border-secondary focus:outline-none" />
-                        <button type="submit" disabled={isSubmitting || !projectId} className="mt-3 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-on-primary disabled:opacity-50">{isSubmitting ? "Saving..." : "Raise blocker"}</button>
+                        <textarea value={description} onChange={(event) => setDescription(event.target.value)} placeholder="Description" rows={3} className="mt-3 w-full rounded-lg border border-outline-variant px-3 py-2 text-sm focus:border-secondary focus:outline-none" />
+                        <button type="submit" disabled={isSubmitting || !projectId} className="mt-3 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-on-primary disabled:opacity-50">{isSubmitting ? "Saving..." : "Raise"}</button>
                     </form>
                 )}
                 <div className="space-y-3">
-                    {blockerTotal === 0 ? <p className="rounded-xl bg-surface-container-lowest p-6 text-sm text-on-surface-variant">No blockers reported.</p> : blockers.map((blocker) => (
+                    {blockerTotal === 0 ? <p className="rounded-xl bg-surface-container-lowest p-6 text-sm text-on-surface-variant">No tickets reported.</p> : blockers.map((blocker) => (
                         <article key={blocker.id} className="rounded-xl bg-surface-container-lowest p-5 shadow-sm">
                             <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-start">
                                 <div>
@@ -142,7 +142,7 @@ function BlockersContent() {
                     ))}
                 </div>
                 {pageCount > 1 && <div className="mt-5 flex items-center justify-between gap-3 text-sm text-on-surface-variant">
-                    <span>{blockerTotal} blockers · Page {page} of {pageCount}</span>
+                    <span>{blockerTotal} tickets · Page {page} of {pageCount}</span>
                     <div className="flex gap-2">
                         <button type="button" disabled={page <= 1} onClick={() => setPage((current) => Math.max(1, current - 1))} className="rounded-lg border border-outline-variant px-3 py-1.5 disabled:opacity-50">Previous</button>
                         <button type="button" disabled={page >= pageCount} onClick={() => setPage((current) => Math.min(pageCount, current + 1))} className="rounded-lg border border-outline-variant px-3 py-1.5 disabled:opacity-50">Next</button>

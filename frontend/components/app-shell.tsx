@@ -16,7 +16,7 @@ const NAV_ITEMS: { key: NavKey | "disabled"; label: string; icon: typeof LayoutD
   { key: "updates", label: "Updates", icon: Sparkles, href: "/updates" },
   { key: "team", label: "Team", icon: UsersRound, href: "/teams", anyPermissions: ["teams:manage", "project_teams:manage", "projects:view", "teams:view_own_roster"] },
   { key: "users", label: "Users", icon: UserCog, href: "/users", anyPermissions: ["users:request", "teams:view_own_roster"] },
-  { key: "blockers", label: "Blockers", icon: TriangleAlert, href: "/blockers", permission: "projects:view" },
+  { key: "blockers", label: "Raise Ticket", icon: TriangleAlert, href: "/blockers", permission: "projects:view" },
   { key: "activity", label: "Activity", icon: Activity, href: "/activity", permission: "audit:view" },
   { key: "disabled", label: "AI Assistant", icon: Sparkles },
 ];

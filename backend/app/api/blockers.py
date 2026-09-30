@@ -60,14 +60,14 @@ def create_blocker(
     try:
         project_service.get_visible_project(payload.project_id, current_user)
         if payload.assignee_id and "tasks:assign" not in {p.code for p in current_user.role.permissions}:
-            raise HTTPException(status_code=403, detail="You do not have permission to assign blockers")
+            raise HTTPException(status_code=403, detail="You do not have permission to assign tickets")
         if payload.assignee_id and not project_service.is_project_member(payload.project_id, payload.assignee_id):
             raise HTTPException(status_code=400, detail="Assignee must belong to the selected project")
         blocker = service.create_blocker(
             project_id=payload.project_id, title=payload.title,
             description=payload.description, raised_by_id=current_user.id, assignee_id=payload.assignee_id,
         )
-        audit.record(user_id=current_user.id, action="blocker_created", detail=f"Raised blocker: {blocker.title}")
+        audit.record(user_id=current_user.id, action="blocker_created", detail=f"Raised ticket: {blocker.title}")
         return _to_out(blocker)
     except ProjectError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=exc.message)
@@ -86,13 +86,13 @@ def update_blocker_assignee(
 ):
     blocker = service.blockers.get_by_id(blocker_id)
     if blocker is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Blocker not found")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Ticket not found")
     try:
         project_service.get_visible_project(blocker.project_id, current_user)
     except ProjectError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=exc.message)
     if payload.assignee_id and not project_service.is_project_member(blocker.project_id, payload.assignee_id):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Assignee must belong to the blocker project")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Assignee must belong to the ticket project")
     blocker = service.update_assignee(blocker_id, payload.assignee_id)
     audit.record(user_id=current_user.id, action="blocker_assigned", detail=f"{blocker.title}: {payload.assignee_id or 'unassigned'}")
     return _to_out(blocker)
