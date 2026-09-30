@@ -81,9 +81,11 @@ class ProjectService:
         self._require_project_manager(project, user)
         return self.projects.update(project, name=name, description=description, priority=priority, maturity=maturity)
 
-    def add_contributor(self, project_id: uuid.UUID, user_id: uuid.UUID, user: User) -> ProjectContributor:
+    def add_contributor(self, project_id: uuid.UUID, user_id: uuid.UUID, user: User, end_date: date | None = None) -> ProjectContributor:
         project = self.get_project(project_id)
         self._require_project_manager(project, user)
+        if end_date is not None and end_date < date.today():
+            raise ProjectError("Contributor assignment end date must be today or later")
         if self.users.get_by_id(user_id) is None:
             raise ProjectError("User not found")
         if "users:manage" not in self._permissions(user) and not self.projects.is_project_team_member(project_id, user_id):
@@ -92,15 +94,30 @@ class ProjectService:
             raise ProjectError("Owner is already implicitly a contributor")
         if self.projects.is_contributor(project_id, user_id):
             raise ProjectError("User is already a contributor on this project")
-        return self.projects.add_contributor(project_id, user_id)
+        return self.projects.add_contributor(project_id, user_id, end_date)
+
+    def remove_contributor(self, project_id: uuid.UUID, user_id: uuid.UUID, user: User) -> None:
+        project = self.get_project(project_id)
+        self._require_project_manager(project, user)
+        if not self.projects.remove_contributor(project_id, user_id):
+            raise ProjectError("Contributor is not currently assigned to this project")
 
     def add_milestone(
         self, project_id: uuid.UUID, *, name: str, due_date: date | None,
-        status: MilestoneStatus = MilestoneStatus.PENDING, user: User,
+        user: User,
     ) -> Milestone:
         project = self.get_project(project_id)
         self._require_project_manager(project, user)
-        return self.projects.add_milestone(project_id, name=name, due_date=due_date, status=status)
+        return self.projects.add_milestone(project_id, name=name, due_date=due_date)
+
+    def update_milestone_status(self, project_id: uuid.UUID, milestone_id: uuid.UUID, status: MilestoneStatus, user: User) -> Milestone:
+        project = self.get_project(project_id)
+        if project.owner_id != user.id:
+            raise ProjectError("Only the project owner can confirm milestone completion")
+        milestone = next((item for item in project.milestones if item.id == milestone_id), None)
+        if milestone is None:
+            raise ProjectError("Milestone not found")
+        return self.projects.update_milestone_status(milestone, status)
 
     def add_team(self, project_id: uuid.UUID, team_id: uuid.UUID, user: User) -> ProjectTeam:
         project = self.get_project(project_id)

@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime
+from datetime import date, datetime
 
 from pydantic import BaseModel, EmailStr
 
@@ -21,6 +21,7 @@ class TeamOut(BaseModel):
 
 class TeamMemberAddRequest(BaseModel):
     user_id: uuid.UUID
+    end_date: date | None = None
 
 
 class RosterMemberOut(BaseModel):
@@ -29,12 +30,23 @@ class RosterMemberOut(BaseModel):
     full_name: str | None
     role_name: str
     joined_at: datetime
+    end_date: date | None
     team_count: int
 
 
 class TeamRosterOut(BaseModel):
     team: TeamOut
     members: list[RosterMemberOut]
+
+
+class TeamMembershipHistoryOut(BaseModel):
+    user_id: uuid.UUID
+    email: EmailStr
+    full_name: str | None
+    role_name: str
+    joined_at: datetime
+    end_date: date | None
+    left_at: datetime | None
 
 
 class MyTeamMemberOut(BaseModel):

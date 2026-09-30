@@ -88,8 +88,6 @@ class ProjectContributor(Base):
     """Join row between User and Project, beyond the single owner."""
 
     __tablename__ = "project_contributors"
-    __table_args__ = (UniqueConstraint("project_id", "user_id", name="uq_project_user"),)
-
     id: Mapped[uuid.UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     project_id: Mapped[uuid.UUID] = mapped_column(
         PGUUID(as_uuid=True), ForeignKey("projects.id", ondelete="CASCADE"), nullable=False, index=True
@@ -98,6 +96,8 @@ class ProjectContributor(Base):
         PGUUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
     )
     added_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+    end_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    removed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
     project: Mapped["Project"] = relationship(back_populates="contributors")
     user: Mapped["User"] = relationship()

@@ -17,6 +17,8 @@ export interface ContributorOut {
   user_id: string;
   email: string;
   full_name: string | null;
+  added_at?: string | null;
+  end_date?: string | null;
 }
 
 export interface ProjectTeamOut {

@@ -1,4 +1,5 @@
 import uuid
+from datetime import date
 
 from app.domain.team import Team, TeamMembership
 from app.repositories.team_repository import TeamRepository
@@ -36,13 +37,15 @@ class TeamService:
             raise TeamError("Team not found")
         return team
 
-    def add_member(self, team_id: uuid.UUID, user_id: uuid.UUID) -> TeamMembership:
+    def add_member(self, team_id: uuid.UUID, user_id: uuid.UUID, end_date: date | None = None) -> TeamMembership:
         self.get_team(team_id)  # 404s if missing
         if self.users.get_by_id(user_id) is None:
             raise TeamError("User not found")
+        if end_date is not None and end_date < date.today():
+            raise TeamError("Membership end date must be today or later")
         if self.teams.is_member(team_id, user_id):
             raise TeamError("User is already a member of this team")
-        return self.teams.add_member(team_id, user_id)
+        return self.teams.add_member(team_id, user_id, end_date)
 
     def remove_member(self, team_id: uuid.UUID, user_id: uuid.UUID) -> None:
         self.get_team(team_id)
@@ -52,6 +55,10 @@ class TeamService:
     def get_roster(self, team_id: uuid.UUID) -> tuple[Team, list[TeamMembership]]:
         team = self.get_team(team_id)
         return team, self.teams.get_roster(team_id)
+
+    def get_membership_history(self, team_id: uuid.UUID) -> list[TeamMembership]:
+        self.get_team(team_id)
+        return self.teams.get_membership_history(team_id)
 
     def count_teams_for_users(self, user_ids: list[uuid.UUID]) -> dict[uuid.UUID, int]:
         return self.teams.count_teams_for_users(user_ids)

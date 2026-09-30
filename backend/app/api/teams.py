@@ -3,7 +3,7 @@ import uuid
 from fastapi import APIRouter, Depends, HTTPException, status
 
 from app.api.deps import get_team_service, require_any_permission, require_permission
-from app.api.schemas.teams import MyTeamMemberOut, RosterMemberOut, TeamCreateRequest, TeamMemberAddRequest, TeamOut, TeamRosterOut
+from app.api.schemas.teams import MyTeamMemberOut, RosterMemberOut, TeamCreateRequest, TeamMemberAddRequest, TeamMembershipHistoryOut, TeamOut, TeamRosterOut
 from app.domain.user import User
 from app.services.team_service import TeamError, TeamService
 
@@ -77,11 +77,37 @@ def add_member(
     _: User = Depends(require_permission("teams:manage")),
 ):
     try:
-        team_service.add_member(team_id, payload.user_id)
+        team_service.add_member(team_id, payload.user_id, payload.end_date)
         return team_service.get_team(team_id)
     except TeamError as exc:
         code = status.HTTP_404_NOT_FOUND if "not found" in exc.message.lower() else status.HTTP_400_BAD_REQUEST
         raise HTTPException(status_code=code, detail=exc.message)
+
+
+@router.get("/{team_id}/history", response_model=list[TeamMembershipHistoryOut])
+def get_membership_history(
+    team_id: uuid.UUID,
+    team_service: TeamService = Depends(get_team_service),
+    current_user: User = Depends(require_any_permission("teams:manage", "project_teams:manage", "projects:view", "teams:view_own_roster")),
+):
+    try:
+        permissions = set(getattr(current_user, "_token_permissions", []))
+        if not permissions.intersection({"teams:manage", "project_teams:manage", "projects:view"}) and not team_service.is_member(team_id, current_user.id):
+            raise TeamError("Team not found")
+        return [
+            TeamMembershipHistoryOut(
+                user_id=membership.user.id,
+                email=membership.user.email,
+                full_name=membership.user.full_name,
+                role_name=membership.user.role.name,
+                joined_at=membership.joined_at,
+                end_date=membership.end_date,
+                left_at=membership.left_at,
+            )
+            for membership in team_service.get_membership_history(team_id)
+        ]
+    except TeamError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=exc.message)
 
 
 @router.delete("/{team_id}/members/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -117,7 +143,7 @@ def get_roster(
     members = [
         RosterMemberOut(
             user_id=m.user.id, email=m.user.email, full_name=m.user.full_name,
-            role_name=m.user.role.name, joined_at=m.joined_at,
+            role_name=m.user.role.name, joined_at=m.joined_at, end_date=m.end_date,
             team_count=team_counts.get(m.user.id, 0),
         )
         for m in memberships

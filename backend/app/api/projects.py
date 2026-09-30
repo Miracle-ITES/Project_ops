@@ -1,13 +1,16 @@
 import uuid
+from datetime import date
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy.orm import Session
 
-from app.api.deps import get_project_service, require_any_permission, require_permission
+from app.api.deps import get_project_service, get_work_db, require_any_permission, require_permission
 from app.api.schemas.projects import (
     ContributorAddRequest,
     ContributorOut,
     MilestoneCreateRequest,
     MilestoneOut,
+    MilestoneStatusUpdateRequest,
     ProjectCreateRequest,
     ProjectDetailOut,
     ProjectTeamAddRequest,
@@ -16,7 +19,8 @@ from app.api.schemas.projects import (
     ProjectUpdateRequest,
 )
 from app.domain.project import Project
-from app.domain.user import User
+from app.domain.user import AuditLog, User
+from app.domain.work import Task
 from app.services.project_service import ProjectError, ProjectService
 
 router = APIRouter(prefix="/projects", tags=["projects"])
@@ -28,8 +32,9 @@ def _to_detail(project: Project) -> ProjectDetailOut:
         priority=project.priority, maturity=project.maturity,
         owner=project.owner,
         contributors=[
-            ContributorOut(user_id=c.user.id, email=c.user.email, full_name=c.user.full_name)
+            ContributorOut(user_id=c.user.id, email=c.user.email, full_name=c.user.full_name, added_at=c.added_at, end_date=c.end_date)
             for c in project.contributors
+            if c.removed_at is None and (c.end_date is None or c.end_date >= date.today())
         ],
         teams=[
             ProjectTeamOut(team_id=pt.team.id, name=pt.team.name, description=pt.team.description)
@@ -85,6 +90,24 @@ def get_project(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=exc.message)
 
 
+@router.delete("/{project_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_project(
+    project_id: uuid.UUID,
+    db: Session = Depends(get_work_db),
+    user: User = Depends(require_permission("projects:manage", revalidate_from_db=True)),
+):
+    project = db.query(Project).filter(Project.id == project_id).first()
+    if project is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Project not found")
+    project_name = project.name
+    # Tasks have a nullable project foreign key without database-level cascade.
+    db.query(Task).filter(Task.project_id == project_id).delete(synchronize_session=False)
+    db.delete(project)
+    db.add(AuditLog(user_id=user.id, action="project_deleted", detail=project_name))
+    db.commit()
+    return None
+
+
 @router.patch("/{project_id}", response_model=ProjectDetailOut)
 def update_project(
     project_id: uuid.UUID,
@@ -110,11 +133,26 @@ def add_contributor(
     user: User = Depends(require_permission("projects:create", revalidate_from_db=True)),
 ):
     try:
-        project_service.add_contributor(project_id, payload.user_id, user)
+        project_service.add_contributor(project_id, payload.user_id, user, payload.end_date)
         return _to_detail(project_service.get_project(project_id))
     except ProjectError as exc:
         code = status.HTTP_404_NOT_FOUND if "not found" in exc.message.lower() else status.HTTP_400_BAD_REQUEST
         raise HTTPException(status_code=code, detail=exc.message)
+
+
+@router.delete("/{project_id}/contributors/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
+def remove_contributor(
+    project_id: uuid.UUID,
+    user_id: uuid.UUID,
+    project_service: ProjectService = Depends(get_project_service),
+    user: User = Depends(require_permission("projects:create", revalidate_from_db=True)),
+):
+    try:
+        project_service.remove_contributor(project_id, user_id, user)
+    except ProjectError as exc:
+        code = status.HTTP_404_NOT_FOUND if "not found" in exc.message.lower() else status.HTTP_400_BAD_REQUEST
+        raise HTTPException(status_code=code, detail=exc.message)
+    return None
 
 
 @router.post("/{project_id}/milestones", response_model=ProjectDetailOut, status_code=status.HTTP_201_CREATED)
@@ -126,11 +164,27 @@ def add_milestone(
 ):
     try:
         project_service.add_milestone(
-            project_id, name=payload.name, due_date=payload.due_date, status=payload.status, user=user,
+            project_id, name=payload.name, due_date=payload.due_date, user=user,
         )
         return _to_detail(project_service.get_project(project_id))
     except ProjectError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=exc.message)
+
+
+@router.patch("/{project_id}/milestones/{milestone_id}", response_model=ProjectDetailOut)
+def update_milestone_status(
+    project_id: uuid.UUID,
+    milestone_id: uuid.UUID,
+    payload: MilestoneStatusUpdateRequest,
+    project_service: ProjectService = Depends(get_project_service),
+    user: User = Depends(require_permission("projects:create", revalidate_from_db=True)),
+):
+    try:
+        project_service.update_milestone_status(project_id, milestone_id, payload.status, user)
+        return _to_detail(project_service.get_project(project_id))
+    except ProjectError as exc:
+        code = status.HTTP_404_NOT_FOUND if "not found" in exc.message.lower() else status.HTTP_403_FORBIDDEN
+        raise HTTPException(status_code=code, detail=exc.message)
 
 
 @router.post("/{project_id}/teams", response_model=ProjectDetailOut, status_code=status.HTTP_201_CREATED)

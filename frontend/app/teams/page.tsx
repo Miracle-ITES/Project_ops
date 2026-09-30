@@ -16,12 +16,17 @@ function TeamsContent() {
   const canManageTeams = hasPermission("teams:manage");
   const canViewAllTeams = canManageTeams || hasPermission("project_teams:manage") || hasPermission("projects:view");
   const [teams, setTeams] = useState<TeamOut[]>([]);
+  const [search, setSearch] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const filteredTeams = teams.filter((team) => {
+    const query = search.trim().toLowerCase();
+    return !query || team.name.toLowerCase().includes(query) || (team.description || "").toLowerCase().includes(query);
+  });
 
   const load = useCallback(async () => {
     setIsLoading(true);
@@ -126,13 +131,26 @@ function TeamsContent() {
           </Dialog>
         )}
 
+        <label className="mb-4 block max-w-xl text-xs font-semibold text-outline">
+          Search teams
+          <input
+            type="search"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search by team name or description"
+            className="mt-1 w-full rounded-lg border border-outline-variant px-3 py-2 text-sm font-normal text-on-surface focus:border-secondary focus:outline-none"
+          />
+        </label>
+
         {isLoading ? (
           <p className="font-body-md text-body-md text-on-surface-variant">Loading...</p>
         ) : teams.length === 0 ? (
           <p className="font-body-md text-body-md text-on-surface-variant">No teams yet.</p>
+        ) : filteredTeams.length === 0 ? (
+          <p className="font-body-md text-body-md text-on-surface-variant">No teams match your search.</p>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-space-md">
-            {teams.map((team) => (
+            {filteredTeams.map((team) => (
               <Link
                 key={team.id}
                 href={`/teams/${team.id}`}

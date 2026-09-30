@@ -23,12 +23,16 @@ class ProjectUpdateRequest(BaseModel):
 
 class ContributorAddRequest(BaseModel):
     user_id: uuid.UUID
+    end_date: date | None = None
 
 
 class MilestoneCreateRequest(BaseModel):
     name: str
     due_date: date | None = None
-    status: MilestoneStatus = MilestoneStatus.PENDING
+
+
+class MilestoneStatusUpdateRequest(BaseModel):
+    status: MilestoneStatus
 
 
 class OwnerOut(BaseModel):
@@ -67,6 +71,8 @@ class ContributorOut(BaseModel):
     user_id: uuid.UUID
     email: EmailStr
     full_name: str | None
+    added_at: datetime | None = None
+    end_date: date | None = None
 
 
 class ProjectTeamOut(BaseModel):

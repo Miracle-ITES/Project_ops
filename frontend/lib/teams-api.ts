@@ -1,5 +1,5 @@
 import { authedFetch } from "./api-client";
-import type { MyTeamMemberOut, TeamOut, TeamRosterOut } from "@/types/teams";
+import type { MyTeamMemberOut, TeamMembershipHistoryOut, TeamOut, TeamRosterOut } from "@/types/teams";
 
 export function listTeams(): Promise<TeamOut[]> {
   return authedFetch<TeamOut[]>("/teams");
@@ -28,15 +28,19 @@ export function getRoster(teamId: string): Promise<TeamRosterOut> {
   return authedFetch<TeamRosterOut>(`/teams/${teamId}/roster`);
 }
 
+export function getMembershipHistory(teamId: string): Promise<TeamMembershipHistoryOut[]> {
+  return authedFetch<TeamMembershipHistoryOut[]>(`/teams/${teamId}/history`);
+}
+
 export function listMyTeamMembers(): Promise<MyTeamMemberOut[]> {
   return authedFetch<MyTeamMemberOut[]>("/teams/mine/members");
 }
 
-export function addMember(teamId: string, userId: string): Promise<TeamOut> {
+export function addMember(teamId: string, userId: string, endDate: string): Promise<TeamOut> {
   return authedFetch<TeamOut>(`/teams/${teamId}/members`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ user_id: userId }),
+    body: JSON.stringify({ user_id: userId, end_date: endDate }),
   });
 }
 
