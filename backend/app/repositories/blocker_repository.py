@@ -1,7 +1,7 @@
 import uuid
-from datetime import datetime
+from datetime import date, datetime
 
-from sqlalchemy import or_, select
+from sqlalchemy import and_, or_, select
 from sqlalchemy.orm import joinedload
 
 from app.domain.project import Blocker, BlockerStatus, Project, ProjectContributor, ProjectTeam
@@ -27,10 +27,18 @@ class BlockerRepository(BaseRepository):
             if "projects:create" in permissions:
                 visible_projects = visible_projects.filter(Project.owner_id == user.id)
             elif "projects:view_assigned" in permissions:
-                user_team_ids = select(TeamMembership.team_id).where(TeamMembership.user_id == user.id)
+                user_team_ids = select(TeamMembership.team_id).where(
+                    TeamMembership.user_id == user.id,
+                    TeamMembership.left_at.is_(None),
+                    or_(TeamMembership.end_date.is_(None), TeamMembership.end_date >= date.today()),
+                )
                 visible_projects = visible_projects.filter(or_(
                     Project.owner_id == user.id,
-                    Project.contributors.any(ProjectContributor.user_id == user.id),
+                    Project.contributors.any(and_(
+                        ProjectContributor.user_id == user.id,
+                        ProjectContributor.removed_at.is_(None),
+                        or_(ProjectContributor.end_date.is_(None), ProjectContributor.end_date >= date.today()),
+                    )),
                     Project.teams.any(ProjectTeam.team_id.in_(user_team_ids)),
                 ))
             else:

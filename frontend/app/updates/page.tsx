@@ -166,7 +166,8 @@ export default function UpdatesPage() {
                     <div className="mt-5 space-y-3">{learning.map((item) => <div key={item.id} className="flex items-center justify-between gap-3 border-t border-outline-variant/40 pt-3">
                         <div>
                             <p className="font-semibold text-on-surface">{item.topic}</p>
-                            <p className="text-xs text-outline">{item.owner.full_name || item.owner.email}{item.session_date ? ` · ${item.session_date}` : ""}</p>
+                            <p className="text-xs text-outline">{item.owner.full_name || item.owner.email}</p>
+                            <p className="mt-1 text-xs text-on-surface-variant">KT session date: {item.session_date ? new Date(`${item.session_date}T00:00:00`).toLocaleDateString() : "Not scheduled"}</p>
                         </div>
                         {canManageLearning ? <select value={item.status} onChange={(event) => updateLearning(item.id, event.target.value as LearningStatus).then(reload)} className="rounded-lg border border-outline-variant px-2 py-1 text-xs">
                             <option value="planned">Planned</option>

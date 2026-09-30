@@ -110,7 +110,7 @@ export default function LoginPage() {
 
             {/* Description */}
             <p className="max-w-lg text-sm leading-relaxed text-emerald-100/80 sm:text-[15px]">
-              Bring projects, tasks, teams, blockers, and operational insights
+              Bring projects, tasks, teams, tickets, and operational insights
               together in one unified workspace built for modern teams.
             </p>
 

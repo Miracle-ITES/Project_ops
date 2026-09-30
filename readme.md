@@ -1,6 +1,6 @@
 # Project Ops
 
-AI-powered team and project operations platform for managing projects, team progress, blockers, and AI-assisted workflows.
+AI-powered team and project operations platform for managing projects, team progress, tickets, and AI-assisted workflows.
 
 ## Tech Stack
 
@@ -94,21 +94,21 @@ python -m app.seed_roles
 
 The frontend currently includes:
 
-| Route                    | Description                                                     |
-| ------------------------ | --------------------------------------------------------------- |
-| `/login`                 | Sign in and restore a session                                   |
-| `/dashboard`             | Project health and operational overview                         |
-| `/users`                 | User requests, administrator approvals, and access management   |
-| `/users/{user_id}`       | User profile and administrator access management                |
-| `/profile`               | Signed-in user's company profile                                |
-| `/teams`                 | Team directory; Leads can view, Administrators can manage       |
-| `/teams/{team_id}`       | Team roster; Administrators and Lead/Managers can manage membership |
-| `/projects`              | Project directory and project creation                          |
+| Route                    | Description                                                                      |
+| ------------------------ | -------------------------------------------------------------------------------- |
+| `/login`                 | Sign in and restore a session                                                    |
+| `/dashboard`             | Role-scoped metrics, critical projects, recent projects, and deadlines within three days |
+| `/users`                 | Search users, review approval requests, and manage access                        |
+| `/users/{user_id}`       | User profile and administrator access management                                 |
+| `/profile`               | Signed-in user's company profile                                                 |
+| `/teams`                 | Team directory with search; Leads can view, Administrators can manage            |
+| `/teams/{team_id}`       | Team roster, assignment end dates, and membership history                        |
+| `/projects`              | Searchable, filterable project directory; Administrators can delete projects     |
 | `/projects/{project_id}` | Project health and priority updates, team/contributor assignment, and milestones |
-| `/blockers`              | Raise and resolve project blockers                              |
-| `/activity`              | Recent authentication and administrative activity               |
-| `/tasks`                 | Project-linked Kanban board with task assignment and status updates |
-| `/updates`               | Daily updates and dated KT/Learning session tracking            |
+| `/blockers`              | Raise and resolve tickets (legacy API route name)                                |
+| `/activity`              | Search and filter recent authentication and administrative activity              |
+| `/tasks`                 | Project-linked Kanban board with task assignment and status updates              |
+| `/updates`               | Daily updates and dated KT/Learning session tracking                             |
 
 ## Health Check
 
@@ -135,14 +135,14 @@ Authentication endpoints:
 
 Inactive users with valid credentials receive `Access denied by administrator`. Incorrect credentials continue to use the generic login error.
 
-The application uses granular permission codes through `require_permission`, rather than hardcoded role checks. Every seeded role has `dashboards:view`; dashboard KPI cards summarize current platform data across users, while the project health list remains scoped to projects visible to the signed-in user. Dashboard values refresh when the page regains focus and every 30 seconds while visible. Members with `projects:view_assigned` can open the Projects section and see projects where they are listed as a contributor or belong to an assigned project team.
+The application uses granular permission codes through `require_permission`, rather than hardcoded role checks. Dashboard metrics and deadlines follow each user's project visibility. Administrators see organization-wide metrics; other roles see information for their visible or assigned projects. The deadline panel includes tasks, milestones, and project or team assignment end dates due today through the next three days, with a View all control when more than five are due. The dashboard also shows the four most recently created visible projects. Members with `projects:view_assigned` see their assigned work and membership deadlines.
 
-| Role           | Capabilities                                                                                                    |
-| -------------- | --------------------------------------------------------------------------------------------------------------- |
-| Administrator  | Manage users, teams, projects, roles, and all seeded permissions                                                |
-| Lead/Manager   | Create/manage teams, add existing users, request new users for admin approval, assign work, and manage projects |
+| Role           | Capabilities                                                                                                                                      |
+| -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Administrator  | Manage users, teams, projects, roles, and all seeded permissions                                                                                  |
+| Lead/Manager   | Create/manage teams, add existing users, request new users for admin approval, assign work, and manage projects                                   |
 | Member         | View assigned projects/tasks, update status on their assigned tasks, submit daily updates, and view their own team roster; cannot create projects |
-| Viewer/Auditor | Read-only dashboard, project, report, and audit access                                                          |
+| Viewer/Auditor | Read-only dashboard, project, report, and audit access                                                                                            |
 
 Roles and permissions are defined in `backend/app/seed_roles.py`. The seed command is safe to rerun and preserves manually granted permissions.
 
@@ -186,67 +186,70 @@ Administrator invitations generate a temporary password and send it by email. Le
 | POST   | `/teams`                             | Administrator or Lead/Manager creates a team                      |
 | GET    | `/teams`                             | List teams                                                        |
 | GET    | `/teams/assignable`                  | List teams assignable to projects                                 |
-| POST   | `/teams/{team_id}/members`           | Administrator or Lead/Manager adds a user to a team              |
-| DELETE | `/teams/{team_id}/members/{user_id}` | Administrator or Lead/Manager removes a user from a team         |
+| POST   | `/teams/{team_id}/members`           | Administrator or Lead/Manager adds a user to a team               |
+| DELETE | `/teams/{team_id}/members/{user_id}` | Administrator or Lead/Manager removes a user from a team          |
 | GET    | `/teams/{team_id}/roster`            | View the team and member roster                                   |
 | GET    | `/teams/mine/members`                | List members of the signed-in user's teams (Lead/Manager, Member) |
 
 After adding or changing seeded permissions, rerun `python -m app.seed_roles` from `backend/` and refresh the affected user's session.
 
-Team membership is stored in `team_memberships` and enforces one membership per team/user pair.
+Team membership is stored in `team_memberships` with join, end, and removal dates. Current rosters omit removed or expired memberships; history shows removed members and completed assignments.
 
 ## Work Management
 
 Tasks, daily updates, and learning/KT sessions use live PostgreSQL data. The Tasks page provides a Kanban board with drag-and-drop status transitions through `backlog`, `in_progress`, and `completed`.
 
-| Method | Endpoint                  | Description                                                          |
-| ------ | ------------------------- | -------------------------------------------------------------------- |
-| GET    | `/tasks`                  | Paginated, searchable, status-filtered task list scoped to the caller |
+| Method | Endpoint                  | Description                                                                  |
+| ------ | ------------------------- | ---------------------------------------------------------------------------- |
+| GET    | `/tasks`                  | Paginated, searchable, status-filtered task list scoped to the caller        |
 | POST   | `/tasks`                  | Create a project-linked task with priority, due date, assignee, and reviewer |
-| PATCH  | `/tasks/{task_id}`        | Update task details, assignment, or status                            |
-| DELETE | `/tasks/{task_id}`        | Delete a task                                                        |
-| GET    | `/daily-updates`          | Paginated updates; Members see their own, project viewers see all     |
-| POST   | `/daily-updates`          | `daily_updates:submit`; submit or update your dated daily update      |
-| GET    | `/learning`               | Paginated learning and KT session records                            |
-| POST   | `/learning`               | Create a learning topic or KT session with session date              |
-| PATCH  | `/learning/{item_id}`     | Track learning progress to completion                                |
-| GET    | `/dashboard`              | Live KPI counts for projects, tasks, blockers, learning, and updates |
-| GET    | `/exports/{resource}.csv` | CSV export for tasks, daily updates, or learning                     |
+| PATCH  | `/tasks/{task_id}`        | Update task details, assignment, or status                                   |
+| DELETE | `/tasks/{task_id}`        | Delete a task                                                                |
+| GET    | `/daily-updates`          | Paginated updates; Members see their own, project viewers see all            |
+| POST   | `/daily-updates`          | `daily_updates:submit`; submit or update your dated daily update             |
+| GET    | `/learning`               | Paginated learning and KT session records                                    |
+| POST   | `/learning`               | Create a learning topic or KT session with session date                      |
+| PATCH  | `/learning/{item_id}`     | Track learning progress to completion                                        |
+| GET    | `/dashboard`              | Role-scoped metrics and deadlines due within the next three days             |
+| GET    | `/exports/{resource}.csv` | CSV export for tasks, daily updates, or learning                             |
 
-Significant work-management mutations write audit entries. Dashboard metrics and project health are queried from the database; no placeholder operational metrics are used.
+Significant work-management mutations write audit entries. Dashboard metrics and deadlines are queried from the database.
 
 Task assignment is limited to active members of the selected project (the owner, contributors, and members of assigned teams). Leads/Managers can create tasks and change assignments only on projects they own; Administrators can manage assignments across projects. Members see tasks assigned to them within projects assigned to them and can update only those tasks' status. Leads see tasks belonging to their owned projects. Project contributors, team assignments, metadata, and member rosters can be managed by that project's owner or an Administrator; a Lead cannot manage another owner's project.
 
 ## Phase 4: Projects
 
-Phase 4 adds projects, contributors, milestones, and project-team assignment. Project priorities are `low`, `medium`, `high`, or `critical`. Project maturity values are `planning`, `active`, `at_risk`, `blocked`, or `completed`.
+Phase 4 adds projects, contributors, milestones, and project-team assignment. Project priorities are `low`, `medium`, `high`, or `critical`. Project maturity values are `planning`, `active`, `at_risk`, `blocked`, or `completed`. Contributor assignments can have end dates; removed contributors remain in project history. Milestones become complete only when confirmed by the project owner; passing a due date shows a reminder and does not complete a milestone automatically.
 
-| Method | Endpoint                                 | Permission             | Description                                         |
-| ------ | ---------------------------------------- | ---------------------- | --------------------------------------------------- |
-| POST   | `/projects`                              | `projects:create`      | Create a project; `owner_id` defaults to the caller |
-| GET    | `/projects`                              | `projects:view` or `projects:view_assigned` | List projects in the caller's visibility scope |
+| Method | Endpoint                                 | Permission                                  | Description                                               |
+| ------ | ---------------------------------------- | ------------------------------------------- | --------------------------------------------------------- |
+| POST   | `/projects`                              | `projects:create`                           | Create a project; `owner_id` defaults to the caller       |
+| GET    | `/projects`                              | `projects:view` or `projects:view_assigned` | List projects in the caller's visibility scope            |
 | GET    | `/projects/{project_id}`                 | `projects:view` or `projects:view_assigned` | Get visible project details, contributors, and milestones |
-| PATCH  | `/projects/{project_id}`                 | `projects:create`      | Update project metadata, health/maturity, and priority |
-| POST   | `/projects/{project_id}/contributors`    | `projects:create`      | Add a contributor                                   |
-| POST   | `/projects/{project_id}/milestones`      | `projects:create`      | Add a milestone                                     |
-| POST   | `/projects/{project_id}/teams`           | `project_teams:manage` | Assign a team to a project                          |
-| DELETE | `/projects/{project_id}/teams/{team_id}` | `project_teams:manage` | Remove a team from a project                        |
+| PATCH  | `/projects/{project_id}`                 | `projects:create`                           | Update project metadata, health/maturity, and priority    |
+| DELETE | `/projects/{project_id}`                 | `projects:manage`                           | Administrator deletes a project and its project data     |
+| POST   | `/projects/{project_id}/contributors`    | `projects:create`                           | Add a contributor                                         |
+| DELETE | `/projects/{project_id}/contributors/{user_id}` | `projects:create`                    | Remove a contributor                                      |
+| POST   | `/projects/{project_id}/milestones`      | `projects:create`                           | Add a milestone                                           |
+| PATCH  | `/projects/{project_id}/milestones/{milestone_id}` | `projects:create`                 | Project owner confirms or reopens milestone status       |
+| POST   | `/projects/{project_id}/teams`           | `project_teams:manage`                      | Assign a team to a project                                |
+| DELETE | `/projects/{project_id}/teams/{team_id}` | `project_teams:manage`                      | Remove a team from a project                              |
 
 The `project_teams:manage` permission is granted only to Administrator and Lead/Manager roles. Project team assignments are stored in `project_teams` and enforce one assignment per project/team pair.
 
-## Blockers and Activity
+## Tickets and Activity
 
-Blockers are linked to projects and can be raised by users with `blockers:raise`. Users with `blockers:manage` can mark blockers as resolved. Blocker creation and status changes are written to the audit activity feed.
+Tickets are linked to projects and can be raised by users with `blockers:raise`. Users with `blockers:manage` can resolve tickets. Ticket creation and status changes are written to the audit activity feed. The API route and permission identifiers retain their existing `blockers` names for compatibility.
 
-| Method | Endpoint                        | Permission        | Description                 |
-| ------ | ------------------------------- | ----------------- | --------------------------- |
-| GET    | `/blockers`                     | `projects:view`   | List project blockers       |
-| POST   | `/blockers`                     | `blockers:raise`  | Raise a blocker on a visible project; optionally assign a project member |
-| PATCH  | `/blockers/{blocker_id}/assignee` | `tasks:assign` | Assign or unassign a project member |
-| PATCH  | `/blockers/{blocker_id}/status` | `blockers:manage` | Resolve or reopen a blocker |
+| Method | Endpoint                          | Permission        | Description                                                              |
+| ------ | --------------------------------- | ----------------- | ------------------------------------------------------------------------ |
+| GET    | `/blockers`                       | `projects:view`   | List project tickets                                                     |
+| POST   | `/blockers`                       | `blockers:raise`  | Raise a ticket on a visible project; optionally assign a project member |
+| PATCH  | `/blockers/{blocker_id}/assignee` | `tasks:assign`    | Assign or unassign a project member                                      |
+| PATCH  | `/blockers/{blocker_id}/status`   | `blockers:manage` | Resolve or reopen a ticket                                               |
 
-Lead/Manager and Member roles can raise blockers; assignments can be changed by users with `tasks:assign` and must target a member of that project. Blocker lists follow the caller's project visibility scope. Run `alembic upgrade head` and `python -m app.seed_roles` after upgrading so the assignee column and permissions are applied.
-| GET    | `/activity`                     | `audit:view`      | List recent audit activity  |
+Lead/Manager and Member roles can raise tickets; assignments can be changed by users with `tasks:assign` and must target a member of that project. Ticket lists follow the caller's project visibility scope. Run `alembic upgrade head` and `python -m app.seed_roles` after upgrading so migrations and permissions are applied.
+| GET | `/activity` | `audit:view` | List recent audit activity |
 
 Example project request:
 
@@ -276,7 +279,7 @@ For a local UI smoke test:
 3. Sign in as the invited user and complete the company profile.
 4. Verify the profile is visible at `/profile` and editable only by the Administrator.
 5. Verify Leads can browse `/teams` and assign teams on project details.
-6. Raise a blocker and confirm it appears in `/activity`.
+6. Raise a ticket and confirm it appears in `/activity`.
 
 ## Testing
 
@@ -352,16 +355,18 @@ Current migration chain:
 
 ### Operational Workflows
 
-- [x] Project blockers and resolution workflow
-- [x] Activity feed for authentication, invitations, and blocker events
+- [x] Project ticket and resolution workflow
+- [x] Searchable, filterable activity feed
 - [x] Inactive-account administrator denial message
 - [x] Responsive personal and administrator profile sections
 - [x] Live dashboard KPI queries and project health data
+- [x] Role-scoped dashboard deadlines and membership end-date reminders
 - [x] Kanban task workflow with drag-and-drop status changes
 - [x] Project-linked tasks with project-member assignment controls
 - [x] Project visibility scoped by role, ownership, and project assignment
 - [x] Task list visibility limited to members' assigned tasks
 - [x] Lead/Manager project membership and team management restricted to owned projects
 - [x] Dated daily updates and learning/KT session tracking
+- [x] Project contributor and team membership timelines with history
 - [x] Paginated work-management lists and CSV exports
 - [x] Administrator-only access controls hidden for Administrator account details

@@ -107,6 +107,7 @@ export function AppShell({ active, breadcrumb, children }: AppShellProps) {
 
           <nav className="flex-1 px-space-md space-y-space-xxs overflow-y-auto">
             {NAV_ITEMS.map((item) => {
+              if (item.key === "users" && user?.role.name === "Member") return null;
               if (item.permission && !hasPermission(item.permission)) return null;
               if (item.anyPermissions && !item.anyPermissions.some(hasPermission)) return null;
               const isActive = item.key === active;
