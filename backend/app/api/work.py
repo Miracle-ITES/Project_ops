@@ -2,7 +2,7 @@ import csv
 import io
 import math
 import uuid
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy import or_
@@ -10,12 +10,12 @@ from sqlalchemy.orm import Session, joinedload, selectinload
 
 from app.api.deps import get_project_service, get_work_db, require_any_permission, require_permission
 from app.api.schemas.work import (
-    DailyUpdateCreate, DailyUpdateOut, DailyUpdatePage, DashboardOut, LearningCreate,
+    DailyUpdateCreate, DailyUpdateOut, DailyUpdatePage, DashboardDeadlineOut, DashboardOut, LearningCreate,
     LearningOut, LearningPage, LearningUpdate, PageMeta, TaskCreate, TaskOut, TaskPage,
     TaskUpdate,
 )
-from app.domain.project import Blocker, BlockerStatus, Project, ProjectContributor, ProjectMaturity, ProjectTeam
-from app.domain.team import TeamMembership
+from app.domain.project import Blocker, BlockerStatus, Milestone, MilestoneStatus, Project, ProjectContributor, ProjectMaturity, ProjectPriority, ProjectTeam
+from app.domain.team import Team, TeamMembership
 from app.domain.user import AuditLog, User
 from app.domain.work import DailyUpdate, LearningItem, LearningStatus, Task, TaskStatus
 from app.services.project_service import ProjectError, ProjectService
@@ -46,8 +46,16 @@ def _task_query(db: Session, search: str | None, task_status: TaskStatus | None,
             if "projects:create" in permissions:
                 project_ids = project_ids.filter(Project.owner_id == user.id)
             elif "projects:view_assigned" in permissions:
-                team_ids = db.query(TeamMembership.team_id).filter(TeamMembership.user_id == user.id)
-                contributor_projects = db.query(ProjectContributor.project_id).filter(ProjectContributor.user_id == user.id)
+                team_ids = db.query(TeamMembership.team_id).filter(
+                    TeamMembership.user_id == user.id,
+                    TeamMembership.left_at.is_(None),
+                    or_(TeamMembership.end_date.is_(None), TeamMembership.end_date >= date.today()),
+                )
+                contributor_projects = db.query(ProjectContributor.project_id).filter(
+                    ProjectContributor.user_id == user.id,
+                    ProjectContributor.removed_at.is_(None),
+                    or_(ProjectContributor.end_date.is_(None), ProjectContributor.end_date >= date.today()),
+                )
                 team_projects = db.query(ProjectTeam.project_id).filter(ProjectTeam.team_id.in_(team_ids))
                 project_ids = project_ids.filter(or_(
                     Project.owner_id == user.id,
@@ -223,9 +231,78 @@ def update_learning(item_id: uuid.UUID, payload: LearningUpdate, db: Session = D
 
 
 @router.get("/dashboard", response_model=DashboardOut)
-def dashboard(db: Session = Depends(get_work_db), _: User = Depends(require_permission("dashboards:view"))):
+def dashboard(
+    db: Session = Depends(get_work_db),
+    user: User = Depends(require_permission("dashboards:view")),
+    project_service: ProjectService = Depends(get_project_service),
+):
     today = date.today()
-    return DashboardOut(active_projects=db.query(Project).filter(Project.maturity == ProjectMaturity.ACTIVE).count(), tasks_due_today=db.query(Task).filter(Task.due_date == today, Task.status != TaskStatus.COMPLETED).count(), open_blockers=db.query(Blocker).filter(Blocker.status == BlockerStatus.OPEN).count(), completed_tasks=db.query(Task).filter(Task.status == TaskStatus.COMPLETED).count(), task_total=db.query(Task).count(), learning_completed=db.query(LearningItem).filter(LearningItem.status == LearningStatus.COMPLETED).count(), daily_updates_today=db.query(DailyUpdate).filter(DailyUpdate.update_date == today).count())
+    deadline_window_end = today + timedelta(days=3)
+    permissions = {permission.code for permission in user.role.permissions}
+    visible_projects = project_service.list_projects(user=user, limit=10000, offset=0)
+    project_ids = [project.id for project in visible_projects]
+    project_by_id = {project.id: project for project in visible_projects}
+    task_query = db.query(Task).filter(Task.project_id.in_(project_ids)) if project_ids else db.query(Task).filter(False)
+    if "projects:view_assigned" in permissions and "projects:view" not in permissions:
+        task_query = task_query.filter(Task.assignee_id == user.id)
+    blocker_query = db.query(Blocker).filter(Blocker.project_id.in_(project_ids)) if project_ids else db.query(Blocker).filter(False)
+    if "projects:view_assigned" in permissions and "projects:view" not in permissions:
+        blocker_query = blocker_query.filter(or_(Blocker.raised_by_id == user.id, Blocker.assignee_id == user.id))
+
+    deadlines: list[DashboardDeadlineOut] = []
+    for task in task_query.filter(
+        Task.due_date >= today,
+        Task.due_date <= deadline_window_end,
+        Task.status != TaskStatus.COMPLETED,
+    ).all():
+        project = project_by_id.get(task.project_id)
+        if project and task.due_date:
+            deadlines.append(DashboardDeadlineOut(id=f"task-{task.id}", title=task.title, project_id=project.id, project_name=project.name, due_date=task.due_date, kind="Task", critical=task.priority.value == "critical"))
+
+    for project, milestone in db.query(Project, Milestone).join(Milestone, Milestone.project_id == Project.id).filter(
+        Project.id.in_(project_ids) if project_ids else False,
+        Milestone.due_date >= today, Milestone.due_date <= deadline_window_end,
+        Milestone.status != MilestoneStatus.COMPLETED,
+    ).all():
+        if milestone.due_date:
+            deadlines.append(DashboardDeadlineOut(id=f"milestone-{milestone.id}", title=milestone.name, project_id=project.id, project_name=project.name, due_date=milestone.due_date, kind="Milestone", critical=project.priority == ProjectPriority.CRITICAL))
+
+    contributor_query = db.query(Project, ProjectContributor, User).join(ProjectContributor, ProjectContributor.project_id == Project.id).join(User, User.id == ProjectContributor.user_id).filter(
+        Project.id.in_(project_ids) if project_ids else False,
+        ProjectContributor.end_date >= today, ProjectContributor.end_date <= deadline_window_end,
+        ProjectContributor.removed_at.is_(None),
+    )
+    if "projects:view_assigned" in permissions and "projects:view" not in permissions:
+        contributor_query = contributor_query.filter(ProjectContributor.user_id == user.id)
+    for project, contributor, member in contributor_query.all():
+        deadlines.append(DashboardDeadlineOut(id=f"contributor-{contributor.id}", title=f"{member.full_name or member.email} assignment ends", project_id=project.id, project_name=project.name, due_date=contributor.end_date, kind="Project membership", critical=project.priority == ProjectPriority.CRITICAL))
+
+    team_query = db.query(Project, ProjectTeam, TeamMembership, Team, User).join(ProjectTeam, ProjectTeam.project_id == Project.id).join(Team, Team.id == ProjectTeam.team_id).join(TeamMembership, TeamMembership.team_id == Team.id).join(User, User.id == TeamMembership.user_id).filter(
+        Project.id.in_(project_ids) if project_ids else False,
+        TeamMembership.end_date >= today, TeamMembership.end_date <= deadline_window_end,
+        TeamMembership.left_at.is_(None),
+    )
+    if "projects:view_assigned" in permissions and "projects:view" not in permissions:
+        team_query = team_query.filter(TeamMembership.user_id == user.id)
+    for project, _project_team, membership, team, member in team_query.all():
+        deadlines.append(DashboardDeadlineOut(id=f"team-{membership.id}-{project.id}", title=f"{member.full_name or member.email} · {team.name} membership ends", project_id=project.id, project_name=project.name, due_date=membership.end_date, kind="Team membership", critical=project.priority == ProjectPriority.CRITICAL))
+
+    deadlines.sort(key=lambda item: (item.due_date, not item.critical, item.project_name.lower()))
+    learning_query = db.query(LearningItem).filter(LearningItem.status == LearningStatus.COMPLETED)
+    updates_query = db.query(DailyUpdate).filter(DailyUpdate.update_date == today)
+    if "projects:view" not in permissions and "users:manage" not in permissions:
+        learning_query = learning_query.filter(LearningItem.owner_id == user.id)
+        updates_query = updates_query.filter(DailyUpdate.user_id == user.id)
+    return DashboardOut(
+        active_projects=sum(project.maturity == ProjectMaturity.ACTIVE for project in visible_projects),
+        tasks_due_today=task_query.filter(Task.due_date == today, Task.status != TaskStatus.COMPLETED).count(),
+        open_tickets=blocker_query.filter(Blocker.status == BlockerStatus.OPEN).count(),
+        completed_tasks=task_query.filter(Task.status == TaskStatus.COMPLETED).count(),
+        task_total=task_query.count(), learning_completed=learning_query.count(),
+        daily_updates_today=updates_query.count(),
+        critical_projects=sum(project.priority == ProjectPriority.CRITICAL and project.maturity != ProjectMaturity.COMPLETED for project in visible_projects),
+        upcoming_deadlines=deadlines,
+    )
 
 
 @router.get("/exports/{resource}.csv")
@@ -236,7 +313,7 @@ def export_resource(resource: str, search: str | None = None, db: Session = Depe
         values = [[str(row.id), row.title, row.status.value, row.priority.value, row.due_date or "", row.assignee.email if row.assignee else ""] for row in rows]
     elif resource == "daily-updates":
         rows = _daily_query(db, search).all()
-        headers = ["id", "date", "user", "summary", "accomplishments", "plans", "blockers"]
+        headers = ["id", "date", "user", "summary", "accomplishments", "plans", "tickets"]
         values = [[str(row.id), row.update_date, row.user.email, row.summary, row.accomplishments or "", row.plans or "", row.blockers or ""] for row in rows]
     elif resource == "learning":
         rows = db.query(LearningItem).options(joinedload(LearningItem.owner)).order_by(LearningItem.created_at.desc()).all()

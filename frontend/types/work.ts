@@ -60,9 +60,20 @@ export interface LearningPage {
 export interface Dashboard {
   active_projects: number;
   tasks_due_today: number;
-  open_blockers: number;
+  open_tickets: number;
   completed_tasks: number;
   task_total: number;
   learning_completed: number;
   daily_updates_today: number;
+  critical_projects: number;
+  upcoming_deadlines: DashboardDeadline[];
+}
+export interface DashboardDeadline {
+  id: string;
+  title: string;
+  project_id: string;
+  project_name: string;
+  due_date: string;
+  kind: string;
+  critical: boolean;
 }

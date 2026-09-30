@@ -25,6 +25,7 @@ function DashboardContent() {
   const [isLoading, setIsLoading] = useState(true);
   const [metrics, setMetrics] = useState<Dashboard | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [showAllDeadlines, setShowAllDeadlines] = useState(false);
 
   const refreshDashboard = useCallback(async () => {
     const [projectResult, metricsResult] = await Promise.allSettled([listProjects(), getDashboard()]);
@@ -74,7 +75,7 @@ function DashboardContent() {
           )}
         </div>
 
-        <div className={`grid grid-cols-1 sm:grid-cols-2 ${isMember ? "xl:grid-cols-3" : "xl:grid-cols-4"} gap-space-md mb-space-lg`}>
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-space-md mb-space-lg">
           <div className="p-4 rounded-xl bg-surface-container-lowest shadow-sm">
             <span className="font-label-sm text-label-sm uppercase tracking-wider font-semibold text-outline">
               Active Projects
@@ -84,6 +85,10 @@ function DashboardContent() {
             </div>
           </div>
           <div className="p-4 rounded-xl bg-surface-container-lowest shadow-sm">
+            <span className="font-label-sm text-label-sm uppercase tracking-wider font-semibold text-outline">Critical Projects</span>
+            <div className="mt-3 font-display-lg text-display-lg font-bold text-error tracking-tight">{isLoading ? "…" : metrics?.critical_projects ?? 0}</div>
+          </div>
+          <div className="p-4 rounded-xl bg-surface-container-lowest shadow-sm">
             <span className="font-label-sm text-label-sm uppercase tracking-wider font-semibold text-outline">
               Tasks Due Today
             </span>
@@ -91,9 +96,9 @@ function DashboardContent() {
           </div>
           <div className="p-4 rounded-xl bg-surface-container-lowest shadow-sm">
             <span className="font-label-sm text-label-sm uppercase tracking-wider font-semibold text-outline">
-              Open Blockers
+              Open Tickets
             </span>
-            <div className="mt-3 font-display-lg text-display-lg font-bold text-error tracking-tight">{isLoading ? "…" : metrics?.open_blockers ?? 0}</div>
+            <div className="mt-3 font-display-lg text-display-lg font-bold text-error tracking-tight">{isLoading ? "…" : metrics?.open_tickets ?? 0}</div>
           </div>
           {!isMember && <div className="p-4 rounded-xl bg-surface-container-lowest shadow-sm">
             <span className="font-label-sm text-label-sm uppercase tracking-wider font-semibold text-outline">
@@ -103,15 +108,49 @@ function DashboardContent() {
           </div>}
         </div>
 
+        <section className="mb-space-lg rounded-xl bg-surface-container-lowest p-space-md shadow-sm" aria-labelledby="deadlines-heading">
+          <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
+            <div>
+              <h2 id="deadlines-heading" className="font-headline-md text-headline-md font-bold text-on-surface">Upcoming deadlines</h2>
+              <p className="text-sm text-on-surface-variant">Tasks, milestones, and project or team assignments due within the next three days.</p>
+            </div>
+            {(metrics?.upcoming_deadlines.length ?? 0) > 5 && (
+              <button type="button" onClick={() => setShowAllDeadlines((show) => !show)} className="text-sm font-semibold text-primary hover:underline">
+                {showAllDeadlines ? "Show less" : `View all (${metrics?.upcoming_deadlines.length ?? 0})`}
+              </button>
+            )}
+          </div>
+          {isLoading ? <p className="py-3 text-sm text-on-surface-variant">Loading deadlines…</p> : !metrics?.upcoming_deadlines?.length ? (
+            <p className="py-3 text-sm text-on-surface-variant">No upcoming deadlines or assignment end dates.</p>
+          ) : (
+            <ul className="divide-y divide-outline-variant/40">
+              {(showAllDeadlines ? metrics.upcoming_deadlines : metrics.upcoming_deadlines.slice(0, 5)).map((deadline) => (
+                <li key={deadline.id} className="flex flex-col gap-1 py-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="min-w-0">
+                    <Link href={`/projects/${deadline.project_id}`} className="font-medium text-on-surface hover:text-primary">{deadline.title}</Link>
+                    <p className="text-xs text-on-surface-variant">{deadline.project_name} · {deadline.kind}{deadline.critical ? " · Critical" : ""}</p>
+                  </div>
+                  <time dateTime={deadline.due_date} className={`shrink-0 text-sm font-semibold ${deadline.due_date < new Date().toISOString().slice(0, 10) ? "text-error" : "text-on-surface-variant"}`}>
+                    {new Date(`${deadline.due_date}T00:00:00`).toLocaleDateString()}
+                  </time>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-space-lg items-start">
           <div className="lg:col-span-8 flex flex-col gap-space-lg">
             {/* Project Health — real data */}
             <div className="p-space-md rounded-xl bg-surface-container-lowest shadow-sm">
-              <div className="pb-space-md">
-                <h2 className="font-headline-md text-headline-md font-bold text-on-surface">Project Health</h2>
+              <div className="pb-space-md flex items-start justify-between gap-3">
+                <div>
+                  <h2 className="font-headline-md text-headline-md font-bold text-on-surface">Recently created projects</h2>
                 <p className="font-body-sm text-body-sm text-on-surface-variant">
-                  Live from your Projects data
+                    Your latest four projects.
                 </p>
+                </div>
+                <Link href="/projects" className="shrink-0 text-sm font-semibold text-primary hover:underline">View projects</Link>
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full text-left font-body-md text-body-md">
@@ -137,12 +176,12 @@ function DashboardContent() {
                         </td>
                       </tr>
                     ) : (
-                      projects.slice(0, 6).map((p) => {
+                      projects.slice(0, 4).map((p) => {
                         const badge = HEALTH_BADGE[p.maturity];
                         return (
                           <tr key={p.id} className="hover:bg-surface-container-low/60 transition-colors">
                             <td className="py-3 px-3 font-title-sm text-title-sm font-semibold text-on-surface">
-                              {p.name}
+                              <Link href={`/projects/${p.id}`} className="hover:text-primary">{p.name}</Link>
                             </td>
                             <td className="py-3 px-3 whitespace-nowrap text-on-surface font-medium">
                               {p.owner.full_name || p.owner.email}
@@ -178,12 +217,12 @@ function DashboardContent() {
           <div className="lg:col-span-4 flex flex-col gap-space-lg">
             <div className="p-space-md rounded-xl bg-surface-container-lowest shadow-sm">
               <div className="pb-space-sm flex items-center gap-2">
-                <h2 className="font-headline-md text-headline-md font-bold text-on-surface">Active Blockers</h2>
+                <h2 className="font-headline-md text-headline-md font-bold text-on-surface">Active Tickets</h2>
               </div>
               <div className="space-y-space-sm mt-1">
                 <div className="p-3 rounded-lg bg-error-container/40">
-                  <p className="text-sm font-medium text-on-error-container">{metrics?.open_blockers ?? 0} blockers need attention</p>
-                  <p className="mt-1 text-xs text-on-error-container/80">Live from the blockers register</p>
+                  <p className="text-sm font-medium text-on-error-container">{metrics?.open_tickets ?? 0} tickets need attention</p>
+                  <p className="mt-1 text-xs text-on-error-container/80">Live from the ticket register</p>
                 </div>
               </div>
             </div>

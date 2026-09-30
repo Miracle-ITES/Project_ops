@@ -100,11 +100,22 @@ class LearningPage(BaseModel):
     items: list[LearningOut]
     meta: PageMeta
 
+class DashboardDeadlineOut(BaseModel):
+    id: str
+    title: str
+    project_id: uuid.UUID
+    project_name: str
+    due_date: date
+    kind: str
+    critical: bool = False
+
 class DashboardOut(BaseModel):
     active_projects: int
     tasks_due_today: int
-    open_blockers: int
+    open_tickets: int
     completed_tasks: int
     task_total: int
     learning_completed: int
     daily_updates_today: int
+    critical_projects: int = 0
+    upcoming_deadlines: list[DashboardDeadlineOut] = Field(default_factory=list)
