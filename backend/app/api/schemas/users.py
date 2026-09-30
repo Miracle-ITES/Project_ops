@@ -1,4 +1,5 @@
 import uuid
+from datetime import datetime
 
 from pydantic import BaseModel, EmailStr, Field
 
@@ -30,6 +31,7 @@ class UserProfileUpdateRequest(BaseModel):
 
 class UserListItemOut(BaseModel):
     id: uuid.UUID
+    created_at: datetime
     email: EmailStr
     full_name: str | None
     is_active: bool

@@ -1,12 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useState, type SubmitEventHandler } from "react";
+import { useCallback, useEffect, useMemo, useState, type SubmitEventHandler } from "react";
 import Link from "next/link";
 import { Plus } from "lucide-react";
 import { RequireAuth } from "@/components/require-auth";
 import { AppShell } from "@/components/app-shell";
 import { useAuth } from "@/lib/auth-context";
-import { createProject, listProjects } from "@/lib/projects-api";
+import { createProject, deleteProject, listProjects } from "@/lib/projects-api";
 import { ApiError } from "@/lib/api-client";
 import type { ProjectListItemOut, ProjectMaturity, ProjectPriority } from "@/types/projects";
 import { Dialog } from "../../components/dialog";
@@ -22,8 +22,12 @@ const HEALTH_BADGE: Record<ProjectMaturity, { text: string; dot: string; classNa
 function ProjectsContent() {
   const { hasPermission } = useAuth();
   const canCreate = hasPermission("projects:create");
+  const canManage = hasPermission("projects:manage");
 
   const [projects, setProjects] = useState<ProjectListItemOut[]>([]);
+  const [search, setSearch] = useState("");
+  const [maturityFilter, setMaturityFilter] = useState<"all" | ProjectMaturity>("all");
+  const [priorityFilter, setPriorityFilter] = useState<"all" | ProjectPriority>("all");
   const [isLoading, setIsLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
 
@@ -32,6 +36,7 @@ function ProjectsContent() {
   const [maturity, setMaturity] = useState<ProjectMaturity>("planning");
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [deletingProjectId, setDeletingProjectId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setIsLoading(true);
@@ -48,6 +53,20 @@ function ProjectsContent() {
       setIsLoading(false);
     }
   }, []);
+
+  async function handleDelete(project: ProjectListItemOut) {
+    if (!window.confirm(`Permanently delete “${project.name}” and its project data?`)) return;
+    setError(null);
+    setDeletingProjectId(project.id);
+    try {
+      await deleteProject(project.id);
+      await load();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Failed to delete project.");
+    } finally {
+      setDeletingProjectId(null);
+    }
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -99,6 +118,16 @@ function ProjectsContent() {
   const healthy = projects.filter((p) => p.maturity === "active" || p.maturity === "completed").length;
   const atRisk = projects.filter((p) => p.maturity === "at_risk").length;
   const blocked = projects.filter((p) => p.maturity === "blocked").length;
+  const filteredProjects = useMemo(() => {
+    const query = search.trim().toLowerCase();
+    return projects.filter((project) => {
+      const matchesSearch = !query || [project.name, project.owner.full_name, project.owner.email]
+        .some((value) => value?.toLowerCase().includes(query));
+      return matchesSearch
+        && (maturityFilter === "all" || project.maturity === maturityFilter)
+        && (priorityFilter === "all" || project.priority === priorityFilter);
+    });
+  }, [projects, search, maturityFilter, priorityFilter]);
 
   return (
     <AppShell active="projects" breadcrumb="Projects Directory">
@@ -198,6 +227,34 @@ function ProjectsContent() {
         )}
 
         <div className="rounded-xl bg-surface-container-lowest shadow-sm p-space-md">
+          <div className="mb-4 grid gap-3 md:grid-cols-[minmax(0,1fr)_minmax(10rem,0.45fr)_minmax(10rem,0.45fr)]">
+            <label className="text-xs font-semibold text-outline">
+              Search projects
+              <input type="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search project or owner" className="mt-1 w-full rounded-lg border border-outline-variant px-3 py-2 text-sm font-normal text-on-surface focus:border-secondary focus:outline-none" />
+            </label>
+            <label className="text-xs font-semibold text-outline">
+              Health
+              <select value={maturityFilter} onChange={(event) => setMaturityFilter(event.target.value as "all" | ProjectMaturity)} className="mt-1 block w-full rounded-lg border border-outline-variant px-3 py-2 text-sm font-normal text-on-surface focus:border-secondary focus:outline-none">
+                <option value="all">All health</option>
+                <option value="planning">Planning</option>
+                <option value="active">Healthy</option>
+                <option value="at_risk">At risk</option>
+                <option value="blocked">Blocked</option>
+                <option value="completed">Completed</option>
+              </select>
+            </label>
+            <label className="text-xs font-semibold text-outline">
+              Priority
+              <select value={priorityFilter} onChange={(event) => setPriorityFilter(event.target.value as "all" | ProjectPriority)} className="mt-1 block w-full rounded-lg border border-outline-variant px-3 py-2 text-sm font-normal text-on-surface focus:border-secondary focus:outline-none">
+                <option value="all">All priorities</option>
+                <option value="low">Low</option>
+                <option value="medium">Medium</option>
+                <option value="high">High</option>
+                <option value="critical">Critical</option>
+              </select>
+            </label>
+          </div>
+          <p className="mb-3 text-xs text-on-surface-variant">Showing {filteredProjects.length} of {projects.length} projects</p>
           <div className="overflow-x-auto">
             <table className="w-full text-left font-body-md text-body-md">
               <thead>
@@ -205,20 +262,25 @@ function ProjectsContent() {
                   <th className="py-2.5 px-3 rounded-l-md">Project</th>
                   <th className="py-2.5 px-3">Owner</th>
                   <th className="py-2.5 px-3">Priority</th>
-                  <th className="py-2.5 px-3 rounded-r-md">Health</th>
+                  <th className={`py-2.5 px-3 ${canManage ? "" : "rounded-r-md"}`}>Health</th>
+                  {canManage && <th className="py-2.5 px-3 rounded-r-md text-center">Actions</th>}
                 </tr>
               </thead>
               <tbody>
                 {isLoading ? (
                   <tr>
-                    <td colSpan={4} className="py-6 px-3 text-on-surface-variant">Loading...</td>
+                    <td colSpan={canManage ? 5 : 4} className="py-6 px-3 text-on-surface-variant">Loading...</td>
                   </tr>
                 ) : projects.length === 0 ? (
                   <tr>
-                    <td colSpan={4} className="py-6 px-3 text-on-surface-variant">No projects yet.</td>
+                    <td colSpan={canManage ? 5 : 4} className="py-6 px-3 text-on-surface-variant">No projects yet.</td>
+                  </tr>
+                ) : filteredProjects.length === 0 ? (
+                  <tr>
+                    <td colSpan={canManage ? 5 : 4} className="py-6 px-3 text-on-surface-variant">No projects match your search and filters.</td>
                   </tr>
                 ) : (
-                  projects.map((p) => {
+                  filteredProjects.map((p) => {
                     const badge = HEALTH_BADGE[p.maturity];
                     return (
                       <tr key={p.id} className="hover:bg-surface-container-low/60 transition-colors">
@@ -239,6 +301,11 @@ function ProjectsContent() {
                             {badge.text}
                           </span>
                         </td>
+                        {canManage && <td className="py-3 px-3 text-center">
+                          <button type="button" disabled={deletingProjectId === p.id} onClick={() => void handleDelete(p)} className="rounded-md border border-error/40 px-2.5 py-1.5 text-xs font-semibold text-error hover:bg-error-container disabled:opacity-50">
+                            {deletingProjectId === p.id ? "Deleting…" : "Delete"}
+                          </button>
+                        </td>}
                       </tr>
                     );
                   })

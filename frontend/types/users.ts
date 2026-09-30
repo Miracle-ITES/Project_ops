@@ -2,6 +2,7 @@ import type { RoleOut } from "./auth";
 
 export interface UserListItemOut {
   id: string;
+  created_at: string;
   email: string;
   full_name: string | null;
   is_active: boolean;

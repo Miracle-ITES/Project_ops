@@ -28,7 +28,7 @@ def _request_out(request: InvitationRequest) -> InvitationRequestOut:
 
 def _to_out(user: User) -> UserListItemOut:
     return UserListItemOut(
-        id=user.id, email=user.email, full_name=user.full_name, is_active=user.is_active,
+        id=user.id, created_at=user.created_at, email=user.email, full_name=user.full_name, is_active=user.is_active,
         profile_completed=user.profile_completed,
         company_name=user.company_name, job_title=user.job_title, department=user.department,
         phone_number=user.phone_number, location=user.location,

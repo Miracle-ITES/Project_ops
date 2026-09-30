@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState, type SubmitEventHandler } from "react";
+import { useCallback, useEffect, useMemo, useState, type SubmitEventHandler } from "react";
 import Link from "next/link";
 import { Plus, UserCog } from "lucide-react";
 import { RequireAuth } from "@/components/require-auth";
@@ -24,6 +24,11 @@ function UsersContent() {
     const [requests, setRequests] = useState<InvitationRequestOut[]>([]);
     const [teamMembers, setTeamMembers] = useState<MyTeamMemberOut[]>([]);
     const [isLoading, setIsLoading] = useState(true);
+    const [search, setSearch] = useState("");
+    const [showAllUsers, setShowAllUsers] = useState(false);
+    const [requestDateFilter, setRequestDateFilter] = useState("all");
+    const [showAllPendingRequests, setShowAllPendingRequests] = useState(false);
+    const [showAllRequestHistory, setShowAllRequestHistory] = useState(false);
     const [showForm, setShowForm] = useState(false);
     const [email, setEmail] = useState("");
     const [fullName, setFullName] = useState("");
@@ -33,11 +38,16 @@ function UsersContent() {
 
     const load = useCallback(async () => {
         setIsLoading(true);
+        setError(null);
         try {
-            const loadedUsers = canManageUsers ? await listUsers() : [];
+            const [loadedUsers, loadedRequests, loadedTeamMembers] = await Promise.all([
+                canManageUsers ? listUsers() : Promise.resolve([]),
+                canManageUsers ? listInvitationRequests() : canRequestUsers ? listMyInvitationRequests() : Promise.resolve([]),
+                canViewTeamRoster ? listMyTeamMembers() : Promise.resolve([]),
+            ]);
             setUsers(loadedUsers);
-            setRequests(canManageUsers ? await listInvitationRequests() : canRequestUsers ? await listMyInvitationRequests() : []);
-            setTeamMembers(canViewTeamRoster ? await listMyTeamMembers() : []);
+            setRequests(loadedRequests);
+            setTeamMembers(loadedTeamMembers);
         } catch (err) {
             setError(err instanceof ApiError ? err.message : "Failed to load users.");
         } finally {
@@ -113,9 +123,44 @@ function UsersContent() {
         }
     }
 
-    const uniqueTeamMembers = Array.from(new Map(teamMembers.map((member) => [member.user_id, member])).values());
+    const uniqueTeamMembers = useMemo(() => Array.from(new Map(teamMembers.map((member) => [member.user_id, member])).values()), [teamMembers]);
     const pendingRequests = requests.filter((request) => request.status === "pending").length;
     const approvedRequests = requests.filter((request) => request.status === "approved").length;
+    const filteredUsers = useMemo(() => {
+        const query = search.trim().toLowerCase();
+        if (!query) return users;
+        return users.filter((user) => [user.full_name, user.email, user.role.name, user.is_active ? "active" : "inactive"]
+            .some((value) => value?.toLowerCase().includes(query)));
+    }, [users, search]);
+    const filteredTeamMembers = useMemo(() => {
+        const query = search.trim().toLowerCase();
+        if (!query) return uniqueTeamMembers;
+        return uniqueTeamMembers.filter((member) => [member.full_name, member.email, member.role_name, member.team_names.join(" "), member.is_active ? "active" : "inactive"]
+            .some((value) => value?.toLowerCase().includes(query)));
+    }, [uniqueTeamMembers, search]);
+    const filteredRequests = useMemo(() => {
+        const query = search.trim().toLowerCase();
+        if (!query) return requests;
+        return requests.filter((request) => [request.full_name, request.email, request.role_name, request.status]
+            .some((value) => value?.toLowerCase().includes(query)));
+    }, [requests, search]);
+    const dateFilteredRequests = useMemo(() => {
+        const now = new Date();
+        const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        const yesterday = new Date(today.getTime() - 24 * 60 * 60 * 1000);
+        const weekStart = new Date(today.getTime() - 6 * 24 * 60 * 60 * 1000);
+        return requests.filter((request) => {
+            const created = new Date(request.created_at);
+            return requestDateFilter === "today" ? created >= today
+                : requestDateFilter === "yesterday" ? created >= yesterday && created < today
+                    : requestDateFilter === "7days" ? created >= weekStart : true;
+        });
+    }, [requests, requestDateFilter]);
+    const pendingRequestsList = dateFilteredRequests.filter((request) => request.status === "pending");
+    const visiblePendingRequests = showAllPendingRequests ? pendingRequestsList : pendingRequestsList.slice(0, 5);
+    const visibleRequestHistory = showAllRequestHistory ? dateFilteredRequests : dateFilteredRequests.slice(0, 5);
+    const tableCount = canManageUsers ? filteredUsers.length : canViewTeamRoster ? filteredTeamMembers.length : filteredRequests.length;
+    const shouldShowAll = showAllUsers;
 
     return (
         <AppShell active="users" breadcrumb="User Administration">
@@ -170,17 +215,34 @@ function UsersContent() {
                     </Dialog>
                 )}
 
-                {canManageUsers && requests.some((request) => request.status === "pending") && <section className="mb-space-lg rounded-xl bg-surface-container-lowest p-space-md shadow-sm"><h2 className="font-headline-md font-bold text-on-surface">Pending user approvals</h2><div className="mt-3 space-y-2">{requests.filter((request) => request.status === "pending").map((request) => <div key={request.id} className="flex flex-col gap-3 border-t border-outline-variant/40 py-3 sm:flex-row sm:items-center sm:justify-between"><div><p className="font-semibold text-on-surface">{request.full_name || request.email}</p><p className="text-xs text-on-surface-variant">{request.email} · {request.role_name} · requested by {request.requested_by_name || "team lead"}</p></div><div className="flex gap-2"><button type="button" onClick={() => void reviewRequest(request, false)} className="rounded-lg border border-error px-3 py-1.5 text-xs font-semibold text-error">Reject</button><button type="button" onClick={() => void reviewRequest(request, true)} className="rounded-lg bg-secondary px-3 py-1.5 text-xs font-semibold text-on-secondary">Approve &amp; email</button></div></div>)}</div></section>}
+                {(canManageUsers && requests.length > 0 || canRequestUsers && !canManageUsers && requests.length > 0) && <label className="mb-space-md block max-w-xs text-xs font-semibold text-outline">
+                    Filter requests by date
+                    <select value={requestDateFilter} onChange={(event) => { setRequestDateFilter(event.target.value); setShowAllPendingRequests(false); setShowAllRequestHistory(false); }} className="mt-1 block w-full rounded-lg border border-outline-variant px-3 py-2 text-sm font-normal text-on-surface focus:border-secondary focus:outline-none">
+                        <option value="all">All dates</option>
+                        <option value="today">Today</option>
+                        <option value="yesterday">Yesterday</option>
+                        <option value="7days">Last 7 days</option>
+                    </select>
+                </label>}
 
-                {canManageUsers && requests.length > 0 && <section className="mb-space-lg rounded-xl bg-surface-container-lowest p-space-md shadow-sm"><div className="flex flex-wrap gap-3"><span className="rounded-lg bg-amber-100 px-3 py-2 text-xs font-semibold text-amber-900">Request: {requests.filter((request) => request.status === "pending").length}</span><span className="rounded-lg bg-secondary-container/60 px-3 py-2 text-xs font-semibold text-on-secondary-container">Approved: {requests.filter((request) => request.status === "approved").length}</span><span className="rounded-lg bg-surface-container-high px-3 py-2 text-xs font-semibold text-on-surface-variant">New user: {requests.filter((request) => request.status === "approved").length}</span></div><div className="mt-3 space-y-2">{requests.map((request) => <div key={request.id} className="flex items-center justify-between border-t border-outline-variant/40 py-2 text-sm"><span className="text-on-surface">{request.full_name || request.email}</span><span className="text-xs font-semibold capitalize text-on-surface-variant">{request.status}</span></div>)}</div></section>}
+                {canManageUsers && pendingRequestsList.length > 0 && <section className="mb-space-lg rounded-xl bg-surface-container-lowest p-space-md shadow-sm"><h2 className="font-headline-md font-bold text-on-surface">Pending user approvals</h2><div className="mt-3 space-y-2">{visiblePendingRequests.map((request) => <div key={request.id} className="flex flex-col gap-3 border-t border-outline-variant/40 py-3 sm:flex-row sm:items-center sm:justify-between"><div><p className="font-semibold text-on-surface">{request.full_name || request.email}</p><p className="text-xs text-on-surface-variant">{request.email} · {request.role_name} · requested by {request.requested_by_name || "team lead"}</p></div><div className="flex gap-2"><button type="button" onClick={() => void reviewRequest(request, false)} className="rounded-lg border border-error px-3 py-1.5 text-xs font-semibold text-error">Reject</button><button type="button" onClick={() => void reviewRequest(request, true)} className="rounded-lg bg-secondary px-3 py-1.5 text-xs font-semibold text-on-secondary">Approve &amp; email</button></div></div>)}</div>{pendingRequestsList.length > 5 && <button type="button" onClick={() => setShowAllPendingRequests((current) => !current)} className="mt-4 rounded-lg border border-outline-variant px-4 py-2 text-sm font-semibold text-on-surface hover:border-secondary hover:text-secondary">{showAllPendingRequests ? "Show recent 5" : `View all ${pendingRequestsList.length} pending requests`}</button>}</section>}
 
-                {canRequestUsers && !canManageUsers && requests.length > 0 && <section className="mb-space-lg rounded-xl bg-surface-container-lowest p-space-md shadow-sm"><h2 className="font-headline-md font-bold text-on-surface">Your user requests</h2><div className="mt-3 space-y-2">{requests.map((request) => <div key={request.id} className="flex items-center justify-between border-t border-outline-variant/40 py-2 text-sm"><span className="text-on-surface">{request.full_name || request.email}</span><span className="text-xs font-semibold capitalize text-on-surface-variant">{request.status}</span></div>)}</div></section>}
+                {canManageUsers && requests.length > 0 && <section className="mb-space-lg rounded-xl bg-surface-container-lowest p-space-md shadow-sm"><div className="flex flex-wrap gap-3"><span className="rounded-lg bg-amber-100 px-3 py-2 text-xs font-semibold text-amber-900">Request: {requests.filter((request) => request.status === "pending").length}</span><span className="rounded-lg bg-secondary-container/60 px-3 py-2 text-xs font-semibold text-on-secondary-container">Approved: {requests.filter((request) => request.status === "approved").length}</span><span className="rounded-lg bg-surface-container-high px-3 py-2 text-xs font-semibold text-on-surface-variant">New user: {requests.filter((request) => request.status === "approved").length}</span></div><div className="mt-3 space-y-2">{visibleRequestHistory.map((request) => <div key={request.id} className="flex items-center justify-between border-t border-outline-variant/40 py-2 text-sm"><span className="text-on-surface">{request.full_name || request.email}</span><span className="text-xs font-semibold capitalize text-on-surface-variant">{request.status}</span></div>)}</div>{dateFilteredRequests.length > 5 && <button type="button" onClick={() => setShowAllRequestHistory((current) => !current)} className="mt-4 rounded-lg border border-outline-variant px-4 py-2 text-sm font-semibold text-on-surface hover:border-secondary hover:text-secondary">{showAllRequestHistory ? "Show recent 5" : `View all ${dateFilteredRequests.length} requests`}</button>}</section>}
+
+                {canRequestUsers && !canManageUsers && requests.length > 0 && <section className="mb-space-lg rounded-xl bg-surface-container-lowest p-space-md shadow-sm"><h2 className="font-headline-md font-bold text-on-surface">Your user requests</h2><div className="mt-3 space-y-2">{visibleRequestHistory.map((request) => <div key={request.id} className="flex items-center justify-between border-t border-outline-variant/40 py-2 text-sm"><span className="text-on-surface">{request.full_name || request.email}</span><span className="text-xs font-semibold capitalize text-on-surface-variant">{request.status}</span></div>)}</div>{dateFilteredRequests.length > 5 && <button type="button" onClick={() => setShowAllRequestHistory((current) => !current)} className="mt-4 rounded-lg border border-outline-variant px-4 py-2 text-sm font-semibold text-on-surface hover:border-secondary hover:text-secondary">{showAllRequestHistory ? "Show recent 5" : `View all ${dateFilteredRequests.length} requests`}</button>}</section>}
 
                 <div className="overflow-x-auto rounded-xl bg-surface-container-lowest p-space-md shadow-sm">
                     {canViewTeamRoster && <div className="mb-3">
                         <h2 className="font-headline-md font-bold text-on-surface">Members of your teams</h2>
                         <p className="mt-1 text-sm text-on-surface-variant">Approved user requests are not added to a team automatically; team membership is managed separately.</p>
                     </div>}
+                    <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+                        <label className="block w-full max-w-xl text-xs font-semibold text-outline">
+                            Search users
+                            <input type="search" value={search} onChange={(event) => { setSearch(event.target.value); setShowAllUsers(false); }} placeholder="Search name, email, role, or team" className="mt-1 w-full rounded-lg border border-outline-variant px-3 py-2 text-sm font-normal text-on-surface focus:border-secondary focus:outline-none" />
+                        </label>
+                        <span className="text-xs text-on-surface-variant">{tableCount} {tableCount === 1 ? "user" : "users"}</span>
+                    </div>
                     <table className="w-full min-w-180 text-left font-body-md text-body-md">
                         <thead>
                             <tr className="bg-surface-container-low/50 font-label-sm text-label-sm uppercase tracking-wider text-outline">
@@ -193,9 +255,9 @@ function UsersContent() {
                         <tbody>
                             {isLoading ? (
                                 <tr><td colSpan={4} className="px-3 py-6 text-on-surface-variant">Loading...</td></tr>
-                            ) : canManageUsers ? users.length === 0 ? (
-                                <tr><td colSpan={4} className="px-3 py-6 text-on-surface-variant">No users yet.</td></tr>
-                            ) : users.map((user) => (
+                            ) : canManageUsers ? filteredUsers.length === 0 ? (
+                                <tr><td colSpan={4} className="px-3 py-6 text-on-surface-variant">{users.length ? "No users match your search." : "No users yet."}</td></tr>
+                            ) : filteredUsers.slice(0, shouldShowAll ? undefined : 10).map((user) => (
                                 <tr key={user.id} className="border-t border-outline-variant/40 hover:bg-surface-container-low/50">
                                     <td className="px-3 py-3">
                                         <Link href={`/users/${user.id}`} className="flex items-center gap-2 hover:text-secondary">
@@ -211,18 +273,18 @@ function UsersContent() {
                                     <td className="px-3 py-3"><span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${user.is_active ? "bg-secondary-container/60 text-on-secondary-container" : "bg-error-container text-on-error-container"}`}>{user.is_active ? "Active" : "Inactive"}</span></td>
                                     <td className="px-3 py-3"><button type="button" onClick={() => void handleActiveChange(user.id, !user.is_active)} className="font-label-sm text-label-sm text-on-surface-variant hover:text-secondary">{user.is_active ? "Deactivate" : "Activate"}</button></td>
                                 </tr>
-                            )) : canViewTeamRoster ? teamMembers.length === 0 ? (
+                            )) : canViewTeamRoster ? filteredTeamMembers.length === 0 ? (
                                 <tr><td colSpan={4} className="px-3 py-6 text-on-surface-variant"><p>No members are listed for your teams yet.</p><p className="mt-1 text-xs">Once a user is added to a team you belong to, they will appear here.</p><Link href="/teams" className="mt-2 inline-block text-sm font-semibold text-secondary hover:underline">View teams</Link></td></tr>
-                            ) : teamMembers.map((member) => (
+                            ) : filteredTeamMembers.slice(0, shouldShowAll ? undefined : 10).map((member) => (
                                 <tr key={member.user_id} className="border-t border-outline-variant/40">
                                     <td className="px-3 py-3"><span className="block font-semibold text-on-surface">{member.full_name || member.email}</span><span className="block text-xs text-on-surface-variant">{member.email}</span></td>
                                     <td className="px-3 py-3">{member.role_name}</td>
                                     <td className="px-3 py-3"><span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${member.is_active ? "bg-secondary-container/60 text-on-secondary-container" : "bg-error-container text-on-error-container"}`}>{member.is_active ? "Active" : "Inactive"}</span></td>
                                     <td className="px-3 py-3 text-on-surface-variant">{member.team_names.join(", ")}</td>
                                 </tr>
-                            )) : requests.length === 0 ? (
-                                <tr><td colSpan={4} className="px-3 py-6 text-on-surface-variant">You have not requested any users yet.</td></tr>
-                            ) : requests.map((request) => (
+                            )) : filteredRequests.length === 0 ? (
+                                <tr><td colSpan={4} className="px-3 py-6 text-on-surface-variant">{requests.length ? "No users match your search." : "You have not requested any users yet."}</td></tr>
+                            ) : filteredRequests.slice(0, shouldShowAll ? undefined : 10).map((request) => (
                                 <tr key={request.id} className="border-t border-outline-variant/40">
                                     <td className="px-3 py-3"><span className="block font-semibold text-on-surface">{request.full_name || request.email}</span><span className="block text-xs text-on-surface-variant">{request.email}</span></td>
                                     <td className="px-3 py-3">{request.role_name}</td>
@@ -232,6 +294,11 @@ function UsersContent() {
                             ))}
                         </tbody>
                     </table>
+                    {tableCount > 10 && <div className="mt-4 flex justify-center">
+                        <button type="button" onClick={() => setShowAllUsers((current) => !current)} className="rounded-lg border border-outline-variant px-4 py-2 text-sm font-semibold text-on-surface hover:border-secondary hover:text-secondary">
+                            {showAllUsers ? "Show recent 10" : `View all ${tableCount} users`}
+                        </button>
+                    </div>}
                 </div>
             </div>
         </AppShell>

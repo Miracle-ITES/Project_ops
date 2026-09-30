@@ -41,7 +41,7 @@ class UserRepository(BaseRepository):
         return user
 
     def list_all(self) -> list[User]:
-        return self.db.query(User).options(joinedload(User.role)).order_by(User.email).all()
+        return self.db.query(User).options(joinedload(User.role)).order_by(User.created_at.desc()).all()
 
     def update_role(self, user: User, role_id: uuid.UUID) -> User:
         user.role_id = role_id
