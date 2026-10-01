@@ -244,11 +244,11 @@ Tickets are linked to projects and can be raised by users with `blockers:raise`.
 | Method | Endpoint                          | Permission        | Description                                                              |
 | ------ | --------------------------------- | ----------------- | ------------------------------------------------------------------------ |
 | GET    | `/blockers`                       | `projects:view`   | List project tickets                                                     |
-| POST   | `/blockers`                       | `blockers:raise`  | Raise a ticket on a visible project; optionally assign a project member |
+| POST   | `/blockers`                       | `blockers:raise`  | Raise a ticket on a visible project; optionally link a task and assign a project member |
 | PATCH  | `/blockers/{blocker_id}/assignee` | `tasks:assign`    | Assign or unassign a project member                                      |
 | PATCH  | `/blockers/{blocker_id}/status`   | `blockers:manage` | Resolve or reopen a ticket                                               |
 
-Lead/Manager and Member roles can raise tickets; assignments can be changed by users with `tasks:assign` and must target a member of that project. Ticket lists follow the caller's project visibility scope. Run `alembic upgrade head` and `python -m app.seed_roles` after upgrading so migrations and permissions are applied.
+Lead/Manager and Member roles can raise tickets; users with `tasks:assign` can select a project member as assignee. The assigned member can see the ticket on the Tickets page even if the ticket's project is outside their normal project list. A ticket can optionally link to a task in its project; the task title is shown on the ticket and issue escalations retain their task link. Run `alembic upgrade head` and `python -m app.seed_roles` after upgrading so migrations and permissions are applied.
 | GET | `/activity` | `audit:view` | List recent audit activity |
 
 Example project request:
@@ -263,6 +263,30 @@ Example project request:
 ```
 
 The Phase 4 database migrations create `teams`, `team_memberships`, `projects`, `project_contributors`, `milestones`, and `project_teams`, plus the PostgreSQL enum types used by project priority, maturity, and milestone status.
+
+## Issues - Manual Reporting
+
+Issues are the general project problem-tracking workflow; Blockers remain the lead/admin-controlled escalation workflow. Members, Leads/Managers, and Administrators can report issues on projects they can access. Reports can be created directly or from a task, which keeps the task and project context linked. View and manage access follows the seeded `issues:view`, `issues:raise`, and `issues:manage` permissions.
+
+| Method | Endpoint | Purpose |
+| ------ | -------- | ------- |
+| GET | `/issues` | List issues visible to the caller, with pagination and optional `status` filter |
+| POST | `/issues` | Manually report a project issue |
+| GET | `/issues/{issue_id}` | Read one issue after scope validation |
+| PATCH | `/issues/{issue_id}` | Lead/Admin update status, priority, severity, assignee, due date, or resolution |
+| POST | `/tasks/{task_id}/report-issue` | Report an issue with project/task context taken from the selected task |
+| GET | `/issues/{issue_id}/comments` | List comments for an issue when authorized as its reporter or a project member |
+| POST | `/issues/{issue_id}/comments` | Add a project-member comment |
+| GET | `/issues/{issue_id}/history` | Read the issue's creation, updates, and comment timeline |
+| POST | `/issues/{issue_id}/escalate` | Lead/Admin-only escalation that creates and links a Blocker ticket |
+
+After upgrading the backend, apply the issue migration and re-run role seeding:
+
+```bash
+cd backend
+alembic upgrade head
+python -m app.seed_roles
+```
 
 ## Verification
 
@@ -306,9 +330,17 @@ Current migration chain:
         └── 0006_user_company_profile
           └── 0007_work_management
             └── 0008_invitation_requests
-          └── 0009_indexes_for_lists
-            └── 0010_task_project_scope
-              └── 0011_blocker_assignment
+              └── 0009_indexes_for_lists
+                └── 0010_task_project_scope
+                  └── 0011_blocker_assignment
+                    └── 0012_task_backlog_status
+                      └── 0013_blocker_created_at_index
+                        └── 0014_team_membership_timeline
+                          └── 0015_proj_contrib
+                            └── 0016_issues
+                              └── 0017_issue_collaboration
+                                └── 0018_issue_blocker_escalation
+                                  └── 0019_blocker_task_link
 ```
 
 ## Implementation Status

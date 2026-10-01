@@ -9,6 +9,12 @@ import { listActivity } from "@/lib/activity-api";
 import type { ActivityOut } from "@/types/activity";
 
 function formatEventName(action: string): string {
+    const issueEventNames: Record<string, string> = {
+        issue_created: "Issue Reported",
+        issue_updated: "Issue Updated",
+        issue_escalated: "Issue Escalated to Ticket",
+    };
+    if (issueEventNames[action]) return issueEventNames[action];
     return action
         .split("_")
         .filter(Boolean)
@@ -67,7 +73,7 @@ function ActivityContent() {
             <div className="max-w-5xl px-gutter-lg py-space-lg">
                 <div className="mb-6">
                     <h1 className="font-headline-xl text-headline-xl font-bold text-on-surface">Activity</h1>
-                    <p className="mt-1 font-body-md text-body-md text-on-surface-variant">Recent authentication, security, and administrative events.</p>
+                    <p className="mt-1 font-body-md text-body-md text-on-surface-variant">Recent authentication, security, issue, and administrative events.</p>
                 </div>
                 {error && <p className="mb-4 rounded-lg bg-error-container px-3 py-2 text-sm text-on-error-container">{error}</p>}
                 <div className="overflow-x-auto rounded-xl bg-surface-container-lowest p-4 shadow-sm">

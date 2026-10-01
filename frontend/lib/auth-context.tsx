@@ -1,6 +1,7 @@
 "use client";
 
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
+import { useRouter } from "next/navigation";
 import { getMe, login as apiLogin, logout as apiLogout, refresh as apiRefresh } from "./api-client";
 import { getRefreshToken } from "./token-store";
 import type { UserOut } from "@/types/auth";
@@ -17,9 +18,19 @@ interface AuthContextValue {
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
+  const router = useRouter();
   const [user, setUser] = useState<UserOut | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const hasRestoredSession = useRef(false);
+
+  useEffect(() => {
+    const handleSessionExpired = () => {
+      setUser(null);
+      router.replace("/login");
+    };
+    window.addEventListener("auth:session-expired", handleSessionExpired);
+    return () => window.removeEventListener("auth:session-expired", handleSessionExpired);
+  }, [router]);
 
   // On first load, an access token doesn't exist yet (it's memory-only and
   // this is a fresh page load), so if a refresh token was persisted, use

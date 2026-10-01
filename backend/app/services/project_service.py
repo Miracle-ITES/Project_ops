@@ -67,6 +67,10 @@ class ProjectService:
         self._require_project_manager(project, user)
         return self.projects.list_project_members(project_id)
 
+    def list_ticket_assignees(self, project_id: uuid.UUID, user: User) -> list[User]:
+        self.get_visible_project(project_id, user)
+        return self.projects.list_project_members(project_id)
+
     def is_project_member(self, project_id: uuid.UUID, user_id: uuid.UUID) -> bool:
         return self.projects.is_project_member(project_id, user_id)
 

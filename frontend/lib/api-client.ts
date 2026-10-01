@@ -2,11 +2,21 @@ import { clearTokens, getAccessToken, getRefreshToken, setTokens } from "./token
 import type { TokenResponse, UserOut } from "@/types/auth";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
+let refreshInFlight: Promise<TokenResponse | null> | null = null;
+
+function expireSession() {
+  clearTokens();
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new Event("auth:session-expired"));
+  }
+}
 
 export class ApiError extends Error {
   status: number;
   constructor(status: number, message: string) {
-    super(message);
+    // Expiry already triggers a login redirect; don't leak this transport
+    // message into page-level error banners while navigation is in flight.
+    super(status === 401 && message === "Session expired" ? "" : message);
     this.status = status;
   }
 }
@@ -33,21 +43,29 @@ export async function login(email: string, password: string): Promise<TokenRespo
 }
 
 export async function refresh(): Promise<TokenResponse | null> {
+  if (refreshInFlight) return refreshInFlight;
   const refreshToken = getRefreshToken();
   if (!refreshToken) return null;
 
-  const res = await fetch(`${API_URL}/auth/refresh`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ refresh_token: refreshToken }),
-  });
-  if (!res.ok) {
-    clearTokens();
-    return null;
+  refreshInFlight = (async () => {
+    const res = await fetch(`${API_URL}/auth/refresh`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ refresh_token: refreshToken }),
+    });
+    if (!res.ok) {
+      clearTokens();
+      return null;
+    }
+    const tokens: TokenResponse = await res.json();
+    setTokens(tokens);
+    return tokens;
+  })();
+  try {
+    return await refreshInFlight;
+  } finally {
+    refreshInFlight = null;
   }
-  const tokens: TokenResponse = await res.json();
-  setTokens(tokens);
-  return tokens;
 }
 
 export async function logout(): Promise<void> {
@@ -88,9 +106,14 @@ export async function authedFetch<T>(path: string, init: RequestInit = {}): Prom
   if (res.status === 401) {
     const refreshed = await refresh();
     if (!refreshed) {
+      expireSession();
       throw new ApiError(401, "Session expired");
     }
     res = await doFetch();
+    if (res.status === 401) {
+      expireSession();
+      throw new ApiError(401, "Session expired");
+    }
   }
 
   if (!res.ok) throw new ApiError(res.status, await parseErrorMessage(res));

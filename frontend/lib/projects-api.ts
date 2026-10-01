@@ -35,6 +35,10 @@ export function listProjectMembers(
   return authedFetch<ContributorOut[]>(`/projects/${projectId}/members`);
 }
 
+export function listTicketAssignees(projectId: string): Promise<ContributorOut[]> {
+  return authedFetch<ContributorOut[]>(`/projects/${projectId}/ticket-assignees`);
+}
+
 export function createProject(payload: {
   name: string;
   description?: string;

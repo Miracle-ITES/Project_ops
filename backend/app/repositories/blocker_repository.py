@@ -15,6 +15,7 @@ class BlockerRepository(BaseRepository):
         permissions = {permission.code for permission in user.role.permissions}
         query = self.db.query(Blocker).options(
             joinedload(Blocker.project),
+            joinedload(Blocker.task),
             joinedload(Blocker.raised_by),
             joinedload(Blocker.assignee),
         )
@@ -43,17 +44,20 @@ class BlockerRepository(BaseRepository):
                 ))
             else:
                 visible_projects = visible_projects.filter(False)
-            query = query.filter(Blocker.project_id.in_(visible_projects))
+            query = query.filter(or_(Blocker.project_id.in_(visible_projects), Blocker.assignee_id == user.id))
 
         total = query.order_by(None).count()
         items = query.order_by(Blocker.created_at.desc(), Blocker.id.desc()).offset(offset).limit(limit).all()
         return items, total
 
-    def create(self, *, project_id: uuid.UUID, title: str, description: str | None, raised_by_id: uuid.UUID, assignee_id: uuid.UUID | None = None) -> Blocker:
-        blocker = Blocker(project_id=project_id, title=title, description=description, raised_by_id=raised_by_id, assignee_id=assignee_id)
+    def create(self, *, project_id: uuid.UUID, title: str, description: str | None, raised_by_id: uuid.UUID, assignee_id: uuid.UUID | None = None, task_id: uuid.UUID | None = None, commit: bool = True) -> Blocker:
+        blocker = Blocker(project_id=project_id, task_id=task_id, title=title, description=description, raised_by_id=raised_by_id, assignee_id=assignee_id)
         self.db.add(blocker)
-        self.db.commit()
-        self.db.refresh(blocker)
+        if commit:
+            self.db.commit()
+            self.db.refresh(blocker)
+        else:
+            self.db.flush()
         return blocker
 
     def update_status(self, blocker: Blocker, status: BlockerStatus) -> Blocker:
@@ -71,7 +75,7 @@ class BlockerRepository(BaseRepository):
     def get_by_id(self, blocker_id: uuid.UUID) -> Blocker | None:
         return (
             self.db.query(Blocker)
-            .options(joinedload(Blocker.project), joinedload(Blocker.raised_by), joinedload(Blocker.assignee))
+            .options(joinedload(Blocker.project), joinedload(Blocker.task), joinedload(Blocker.raised_by), joinedload(Blocker.assignee))
             .filter(Blocker.id == blocker_id)
             .first()
         )

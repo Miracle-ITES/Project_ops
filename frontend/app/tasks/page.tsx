@@ -7,7 +7,11 @@ import { RequireAuth } from "@/components/require-auth";
 import { useAuth } from "@/lib/auth-context";
 import { listProjectMembers, listProjects } from "@/lib/projects-api";
 import { createTask, listTasks, updateTask } from "@/lib/work-api";
+import { reportTaskIssue } from "@/lib/issues-api";
+import { ApiError } from "@/lib/api-client";
+import { Dialog } from "@/components/dialog";
 import type { ContributorOut, ProjectListItemOut } from "@/types/projects";
+import type { IssuePriority } from "@/types/issues";
 import type { Task, TaskPriority, TaskStatus } from "@/types/work";
 
 const columns: { status: TaskStatus; label: string }[] = [
@@ -27,6 +31,7 @@ function TasksContent() {
     const canCreateTasks = hasPermission("projects:create");
     const canAssignTasks = hasPermission("tasks:assign");
     const canUpdateAssignedTasks = hasPermission("status:update");
+    const canRaiseIssues = hasPermission("issues:raise");
     const [tasks, setTasks] = useState<Task[]>([]);
     const [projects, setProjects] = useState<ProjectListItemOut[]>([]);
     const [projectMembers, setProjectMembers] = useState<Record<string, ContributorOut[]>>({});
@@ -39,6 +44,15 @@ function TasksContent() {
     const [error, setError] = useState<string | null>(null);
     const [draggedTaskId, setDraggedTaskId] = useState<string | null>(null);
     const [dropTarget, setDropTarget] = useState<TaskStatus | null>(null);
+    const [reportingTaskId, setReportingTaskId] = useState<string | null>(null);
+    const [issueTitle, setIssueTitle] = useState("");
+    const [issueDescription, setIssueDescription] = useState("");
+    const [issueCategory, setIssueCategory] = useState("general");
+    const [issuePriority, setIssuePriority] = useState<IssuePriority>("medium");
+    const [issueSeverity, setIssueSeverity] = useState<IssuePriority>("medium");
+    const [issueDueDate, setIssueDueDate] = useState("");
+    const [issueError, setIssueError] = useState<string | null>(null);
+    const [issueSaving, setIssueSaving] = useState(false);
     useEffect(() => {
         void listTasks({ search: search || undefined })
             .then((page) => setTasks(page.items))
@@ -91,6 +105,31 @@ function TasksContent() {
         } catch {
             setTasks(previous);
             setError("Could not update task.");
+        }
+    }
+    async function submitTaskIssue(event: React.FormEvent<HTMLFormElement>, task: Task) {
+        event.preventDefault();
+        if (!task.project_id || !issueTitle.trim()) return;
+        setIssueSaving(true);
+        setIssueError(null);
+        try {
+            await reportTaskIssue(task.id, {
+                title: issueTitle.trim(), description: issueDescription || undefined,
+                category: issueCategory, priority: issuePriority, severity: issueSeverity,
+                due_date: issueDueDate || undefined,
+            });
+            setReportingTaskId(null);
+            setIssueTitle("");
+            setIssueDescription("");
+            setIssueCategory("general");
+            setIssuePriority("medium");
+            setIssueSeverity("medium");
+            setIssueDueDate("");
+            setError(null);
+        } catch (err) {
+            setIssueError(err instanceof ApiError ? err.message : "Could not report an issue for this task.");
+        } finally {
+            setIssueSaving(false);
         }
     }
     function handleDrop(status: TaskStatus) {
@@ -196,6 +235,47 @@ function TasksContent() {
                         </button>
                     </form>
                 )}
+                {reportingTaskId && tasks.find((task) => task.id === reportingTaskId) && (() => {
+                    const task = tasks.find((item) => item.id === reportingTaskId)!;
+                    return <Dialog title="Report issue" description={`Linked to task: ${task.title}`} onClose={() => setReportingTaskId(null)}>
+                        <form onSubmit={(event) => void submitTaskIssue(event, task)} className="space-y-3">
+                            <label className="block text-sm font-medium text-on-surface-variant">Project
+                                <input readOnly value={task.project_id ? projectNames.get(task.project_id) || "Project" : ""} className="mt-1 w-full rounded-lg border border-outline-variant bg-surface-container-low px-3 py-2 text-sm text-on-surface" />
+                            </label>
+                            <label className="block text-sm font-medium text-on-surface-variant">Issue title
+                                <input required maxLength={200} value={issueTitle} onChange={(event) => setIssueTitle(event.target.value)} placeholder="Issue title" className="mt-1 w-full rounded-lg border border-outline-variant px-3 py-2 text-sm text-on-surface" />
+                            </label>
+                            <div className="grid grid-cols-2 gap-3">
+                                <label className="text-sm font-medium text-on-surface-variant">Category
+                                    <select value={issueCategory} onChange={(event) => setIssueCategory(event.target.value)} className="mt-1 w-full rounded-lg border border-outline-variant px-3 py-2 text-sm text-on-surface">
+                                        <option value="general">General</option><option value="bug">Bug</option><option value="task">Task</option><option value="access">Access</option><option value="data">Data</option><option value="other">Other</option>
+                                    </select>
+                                </label>
+                                <label className="text-sm font-medium text-on-surface-variant">Priority
+                                    <select value={issuePriority} onChange={(event) => setIssuePriority(event.target.value as IssuePriority)} className="mt-1 w-full rounded-lg border border-outline-variant px-3 py-2 text-sm text-on-surface">
+                                        <option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option><option value="critical">Critical</option>
+                                    </select>
+                                </label>
+                                <label className="text-sm font-medium text-on-surface-variant">Severity
+                                    <select value={issueSeverity} onChange={(event) => setIssueSeverity(event.target.value as IssuePriority)} className="mt-1 w-full rounded-lg border border-outline-variant px-3 py-2 text-sm text-on-surface">
+                                        <option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option><option value="critical">Critical</option>
+                                    </select>
+                                </label>
+                                <label className="text-sm font-medium text-on-surface-variant">Due date
+                                    <input type="date" value={issueDueDate} onChange={(event) => setIssueDueDate(event.target.value)} className="mt-1 w-full rounded-lg border border-outline-variant px-3 py-2 text-sm text-on-surface" />
+                                </label>
+                            </div>
+                            <label className="block text-sm font-medium text-on-surface-variant">Description
+                                <textarea value={issueDescription} onChange={(event) => setIssueDescription(event.target.value)} placeholder="Describe the issue and its impact" rows={3} className="mt-1 w-full rounded-lg border border-outline-variant px-3 py-2 text-sm text-on-surface" />
+                            </label>
+                            {issueError && <p role="alert" className="rounded-lg bg-error-container px-3 py-2 text-sm text-on-error-container">{issueError}</p>}
+                            <div className="flex justify-end gap-2 pt-1">
+                                <button type="button" onClick={() => setReportingTaskId(null)} className="rounded-lg border border-outline-variant px-3 py-2 text-sm">Cancel</button>
+                                <button type="submit" disabled={issueSaving || !task.project_id} className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-on-primary disabled:opacity-50">{issueSaving ? "Reporting..." : "Raise issue"}</button>
+                            </div>
+                        </form>
+                    </Dialog>;
+                })()}
                 <div className="grid gap-4 lg:grid-cols-3">
                     {columns.map((column) => (
                         <section
@@ -318,6 +398,9 @@ function TasksContent() {
                                                         Complete
                                                     </button>
                                                 )}
+                                            </div>}
+                                            {canRaiseIssues && task.project_id && <div className="mt-3 border-t border-outline-variant pt-3">
+                                                <button type="button" onClick={() => { setReportingTaskId(task.id); setIssueTitle(task.title); setIssueDescription(""); setIssueCategory("general"); setIssuePriority("medium"); setIssueSeverity("medium"); setIssueDueDate(""); setIssueError(null); }} className="text-xs font-semibold text-secondary hover:underline">Report issue</button>
                                             </div>}
                                         </article>
                                     ))}

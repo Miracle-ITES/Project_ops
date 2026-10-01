@@ -8,6 +8,7 @@ from app.domain.project import BlockerStatus
 
 class BlockerCreateRequest(BaseModel):
     project_id: uuid.UUID
+    task_id: uuid.UUID | None = None
     title: str = Field(min_length=1, max_length=200)
     description: str | None = None
     assignee_id: uuid.UUID | None = None
@@ -24,6 +25,8 @@ class BlockerStatusUpdateRequest(BaseModel):
 class BlockerOut(BaseModel):
     id: uuid.UUID
     project_id: uuid.UUID
+    task_id: uuid.UUID | None
+    task_title: str | None
     project_name: str
     title: str
     description: str | None

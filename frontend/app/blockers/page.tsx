@@ -3,12 +3,15 @@
 import { useCallback, useEffect, useState, type SubmitEventHandler } from "react";
 import { AppShell } from "@/components/app-shell";
 import { RequireAuth } from "@/components/require-auth";
+import { Dialog } from "@/components/dialog";
 import { ApiError } from "@/lib/api-client";
 import { assignBlocker, createBlocker, listBlockers, updateBlockerStatus } from "@/lib/blockers-api";
-import { listProjectMembers, listProjects } from "@/lib/projects-api";
+import { listTicketAssignees, listProjects } from "@/lib/projects-api";
+import { listTasks } from "@/lib/work-api";
 import { useAuth } from "@/lib/auth-context";
 import type { BlockerOut } from "@/types/blockers";
 import type { ContributorOut, ProjectListItemOut } from "@/types/projects";
+import type { Task } from "@/types/work";
 
 function BlockersContent() {
     const { hasPermission } = useAuth();
@@ -18,13 +21,19 @@ function BlockersContent() {
     const [blockerTotal, setBlockerTotal] = useState(0);
     const [projects, setProjects] = useState<ProjectListItemOut[]>([]);
     const [projectId, setProjectId] = useState("");
+    const [taskId, setTaskId] = useState("");
+    const [projectTasks, setProjectTasks] = useState<Task[]>([]);
     const [assigneeId, setAssigneeId] = useState("");
     const [projectMembers, setProjectMembers] = useState<Record<string, ContributorOut[]>>({});
+    const [assignmentTicket, setAssignmentTicket] = useState<BlockerOut | null>(null);
+    const [assignmentAssigneeId, setAssignmentAssigneeId] = useState("");
+    const [isSavingAssignee, setIsSavingAssignee] = useState(false);
     const [title, setTitle] = useState("");
     const [description, setDescription] = useState("");
     const [error, setError] = useState<string | null>(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
-    const canAssign = hasPermission("tasks:assign");
+    const canAssign = hasPermission("blockers:raise") || hasPermission("blockers:manage");
+    const canReassign = hasPermission("tasks:assign");
 
     const load = useCallback(async (requestedPage = page) => {
         try {
@@ -41,11 +50,28 @@ function BlockersContent() {
     }, [page, projectId]);
 
     useEffect(() => {
-        if (!canAssign || projects.length === 0) return;
-        void Promise.all(projects.map(async (project) => [project.id, await listProjectMembers(project.id)] as const))
-            .then((entries) => setProjectMembers(Object.fromEntries(entries)))
-            .catch(() => setError("Could not load project members."));
-    }, [projects, canAssign]);
+        let cancelled = false;
+        if (!projectId) {
+            return () => { cancelled = true; };
+        }
+        void listTasks({ project_id: projectId })
+            .then((response) => { if (!cancelled) setProjectTasks(response.items); })
+            .catch(() => { if (!cancelled) setProjectTasks([]); });
+        return () => { cancelled = true; };
+    }, [projectId]);
+
+    useEffect(() => {
+        if (!canAssign || !projectId) return;
+        let cancelled = false;
+        void listTicketAssignees(projectId)
+            .then((members) => {
+                if (!cancelled) setProjectMembers((current) => ({ ...current, [projectId]: members }));
+            })
+            .catch((err) => {
+                if (!cancelled) setError(err instanceof ApiError ? err.message : "Could not load project members.");
+            });
+        return () => { cancelled = true; };
+    }, [projectId, canAssign]);
 
     useEffect(() => {
         let cancelled = false;
@@ -63,10 +89,11 @@ function BlockersContent() {
         setError(null);
         setIsSubmitting(true);
         try {
-            await createBlocker({ project_id: projectId, title, description: description || undefined, assignee_id: assigneeId || undefined });
+            await createBlocker({ project_id: projectId, task_id: taskId || undefined, title, description: description || undefined, assignee_id: assigneeId || undefined });
             setTitle("");
             setDescription("");
             setAssigneeId("");
+            setTaskId("");
             await load(1);
         } catch (err) {
             setError(err instanceof ApiError ? err.message : "Failed to raise ticket.");
@@ -85,12 +112,33 @@ function BlockersContent() {
         }
     }
 
-    async function changeAssignee(blockerId: string, nextAssigneeId: string) {
+    async function openAssignment(blocker: BlockerOut) {
+        setError(null);
         try {
-            const updated = await assignBlocker(blockerId, nextAssigneeId || null);
+            let members = projectMembers[blocker.project_id];
+            if (!members) {
+                members = await listTicketAssignees(blocker.project_id);
+                setProjectMembers((current) => ({ ...current, [blocker.project_id]: members }));
+            }
+            setAssignmentAssigneeId(blocker.assignee_id || "");
+            setAssignmentTicket(blocker);
+        } catch (err) {
+            setError(err instanceof ApiError ? err.message : "Could not load project members.");
+        }
+    }
+
+    async function changeAssignee() {
+        if (!assignmentTicket) return;
+        setIsSavingAssignee(true);
+        setError(null);
+        try {
+            const updated = await assignBlocker(assignmentTicket.id, assignmentAssigneeId || null);
             setBlockers((current) => current.map((blocker) => blocker.id === updated.id ? updated : blocker));
+            setAssignmentTicket(null);
         } catch (err) {
             setError(err instanceof ApiError ? err.message : "Failed to assign ticket.");
+        } finally {
+            setIsSavingAssignee(false);
         }
     }
 
@@ -106,9 +154,13 @@ function BlockersContent() {
                     <form onSubmit={handleCreate} className="mb-6 rounded-xl bg-surface-container-lowest p-5 shadow-sm">
                         <h2 className="font-headline-md text-headline-md font-bold text-on-surface">Raise a Ticket</h2>
                         <div className="mt-4 grid gap-3 md:grid-cols-2">
-                            <select required value={projectId} onChange={(event) => setProjectId(event.target.value)} className="rounded-lg border border-outline-variant px-3 py-2 text-sm focus:border-secondary focus:outline-none">
+                            <select required value={projectId} onChange={(event) => { setProjectId(event.target.value); setTaskId(""); setProjectTasks([]); }} className="rounded-lg border border-outline-variant px-3 py-2 text-sm focus:border-secondary focus:outline-none">
                                 <option value="">Select project</option>
                                 {projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}
+                            </select>
+                            <select value={taskId} onChange={(event) => setTaskId(event.target.value)} disabled={!projectId || projectTasks.length === 0} className="rounded-lg border border-outline-variant px-3 py-2 text-sm focus:border-secondary focus:outline-none disabled:opacity-60">
+                                <option value="">Project-level ticket (no task)</option>
+                                {projectTasks.map((task) => <option key={task.id} value={task.id}>{task.title}</option>)}
                             </select>
                             {canAssign && <select value={assigneeId} onChange={(event) => setAssigneeId(event.target.value)} className="rounded-lg border border-outline-variant px-3 py-2 text-sm focus:border-secondary focus:outline-none">
                                 <option value="">Unassigned</option>
@@ -127,16 +179,15 @@ function BlockersContent() {
                                 <div>
                                     <div className="flex flex-wrap items-center gap-2"><h2 className="font-title-md text-title-md font-semibold text-on-surface">{blocker.title}</h2><span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${blocker.status === "open" ? "bg-error-container text-on-error-container" : "bg-secondary-container/60 text-on-secondary-container"}`}>{blocker.status}</span></div>
                                     <p className="mt-1 text-sm text-secondary">{blocker.project_name}</p>
+                                    {blocker.task_title && <p className="mt-1 text-xs text-on-surface-variant">Task: {blocker.task_title}</p>}
                                     {blocker.description && <p className="mt-2 text-sm text-on-surface-variant">{blocker.description}</p>}
                                     <p className="mt-3 text-xs text-outline">Raised by {blocker.raised_by_email} on {new Date(blocker.created_at).toLocaleString()}</p>
-                                    {canAssign ? <label className="mt-2 flex items-center gap-2 text-xs text-on-surface-variant">Assigned to
-                                        <select value={blocker.assignee_id || ""} onChange={(event) => void changeAssignee(blocker.id, event.target.value)} className="rounded-lg border border-outline-variant px-2 py-1">
-                                            <option value="">Unassigned</option>
-                                            {(projectMembers[blocker.project_id] || []).map((member) => <option key={member.user_id} value={member.user_id}>{member.full_name || member.email}</option>)}
-                                        </select>
-                                    </label> : <p className="mt-2 text-xs text-outline">Assigned to {blocker.assignee_email || "Unassigned"}</p>}
+                                    <p className="mt-2 text-xs text-outline">Assigned to {blocker.assignee_email || "Unassigned"}</p>
                                 </div>
-                                {blocker.status === "open" && hasPermission("blockers:manage") && <button type="button" onClick={() => void resolveBlocker(blocker.id)} className="rounded-lg border border-outline-variant px-3 py-1.5 text-sm text-on-surface hover:border-secondary hover:text-secondary">Mark resolved</button>}
+                                <div className="flex gap-2">
+                                    {canReassign && <button type="button" onClick={() => void openAssignment(blocker)} className="rounded-lg border border-outline-variant px-3 py-1.5 text-sm text-on-surface hover:border-secondary hover:text-secondary">Assign</button>}
+                                    {blocker.status === "open" && hasPermission("blockers:manage") && <button type="button" onClick={() => void resolveBlocker(blocker.id)} className="rounded-lg border border-outline-variant px-3 py-1.5 text-sm text-on-surface hover:border-secondary hover:text-secondary">Mark resolved</button>}
+                                </div>
                             </div>
                         </article>
                     ))}
@@ -148,11 +199,23 @@ function BlockersContent() {
                         <button type="button" disabled={page >= pageCount} onClick={() => setPage((current) => Math.min(pageCount, current + 1))} className="rounded-lg border border-outline-variant px-3 py-1.5 disabled:opacity-50">Next</button>
                     </div>
                 </div>}
+                {assignmentTicket && <Dialog title="Assign ticket" description={`${assignmentTicket.title} · ${assignmentTicket.project_name}`} onClose={() => !isSavingAssignee && setAssignmentTicket(null)}>
+                    <label className="block text-sm font-medium text-on-surface">Project member
+                        <select value={assignmentAssigneeId} onChange={(event) => setAssignmentAssigneeId(event.target.value)} className="mt-2 w-full rounded-lg border border-outline-variant px-3 py-2">
+                            <option value="">Unassigned</option>
+                            {(projectMembers[assignmentTicket.project_id] || []).map((member) => <option key={member.user_id} value={member.user_id}>{member.full_name || member.email}</option>)}
+                        </select>
+                    </label>
+                    <div className="mt-5 flex justify-end gap-2">
+                        <button type="button" disabled={isSavingAssignee} onClick={() => setAssignmentTicket(null)} className="rounded-lg border border-outline-variant px-4 py-2 text-sm">Cancel</button>
+                        <button type="button" disabled={isSavingAssignee} onClick={() => void changeAssignee()} className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-on-primary disabled:opacity-50">{isSavingAssignee ? "Saving..." : "Save assignment"}</button>
+                    </div>
+                </Dialog>}
             </div>
         </AppShell>
     );
 }
 
 export default function BlockersPage() {
-    return <RequireAuth permission="projects:view"><BlockersContent /></RequireAuth>;
+    return <RequireAuth anyPermissions={["projects:view", "projects:view_assigned"]}><BlockersContent /></RequireAuth>;
 }

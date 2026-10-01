@@ -20,11 +20,11 @@ class BlockerService:
     def list_blockers(self, user: User, *, offset: int, limit: int) -> tuple[list[Blocker], int]:
         return self.blockers.list_visible(user, offset=offset, limit=limit)
 
-    def create_blocker(self, *, project_id: uuid.UUID, title: str, description: str | None, raised_by_id: uuid.UUID, assignee_id: uuid.UUID | None = None) -> Blocker:
+    def create_blocker(self, *, project_id: uuid.UUID, title: str, description: str | None, raised_by_id: uuid.UUID, assignee_id: uuid.UUID | None = None, task_id: uuid.UUID | None = None, commit: bool = True) -> Blocker:
         if self.projects.get_by_id(project_id) is None:
             raise BlockerServiceError("Project not found")
         return self.blockers.create(
-            project_id=project_id, title=title, description=description, raised_by_id=raised_by_id, assignee_id=assignee_id,
+            project_id=project_id, title=title, description=description, raised_by_id=raised_by_id, assignee_id=assignee_id, task_id=task_id, commit=commit,
         )
 
     def update_assignee(self, blocker_id: uuid.UUID, assignee_id: uuid.UUID | None) -> Blocker:

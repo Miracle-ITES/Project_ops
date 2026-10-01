@@ -3,6 +3,8 @@ export type BlockerStatus = "open" | "resolved";
 export interface BlockerOut {
   id: string;
   project_id: string;
+  task_id: string | null;
+  task_title: string | null;
   project_name: string;
   title: string;
   description: string | null;

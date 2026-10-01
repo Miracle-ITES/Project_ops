@@ -230,3 +230,18 @@ def list_project_members(
         ]
     except ProjectError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=exc.message)
+
+
+@router.get("/{project_id}/ticket-assignees", response_model=list[ContributorOut])
+def list_ticket_assignees(
+    project_id: uuid.UUID,
+    project_service: ProjectService = Depends(get_project_service),
+    user: User = Depends(require_any_permission("blockers:raise", "blockers:manage")),
+):
+    try:
+        return [
+            ContributorOut(user_id=member.id, email=member.email, full_name=member.full_name)
+            for member in project_service.list_ticket_assignees(project_id, user)
+        ]
+    except ProjectError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=exc.message)

@@ -152,6 +152,9 @@ class Blocker(Base):
     project_id: Mapped[uuid.UUID] = mapped_column(
         PGUUID(as_uuid=True), ForeignKey("projects.id", ondelete="CASCADE"), nullable=False, index=True
     )
+    task_id: Mapped[uuid.UUID | None] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("tasks.id", ondelete="SET NULL"), nullable=True, index=True
+    )
     title: Mapped[str] = mapped_column(String(200), nullable=False)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     status: Mapped[BlockerStatus] = mapped_column(
@@ -169,5 +172,6 @@ class Blocker(Base):
     resolved_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
     project: Mapped["Project"] = relationship(back_populates="blockers")
+    task: Mapped["Task | None"] = relationship("Task")
     raised_by: Mapped["User"] = relationship(foreign_keys=[raised_by_id])
     assignee: Mapped["User | None"] = relationship(foreign_keys=[assignee_id])

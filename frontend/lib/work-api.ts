@@ -12,14 +12,15 @@ import type {
   LearningStatus,
 } from "@/types/work";
 
-const query = (params: Record<string, string | undefined>) =>
-  new URLSearchParams(
-    Object.entries(params).filter((entry): entry is [string, string] =>
-      Boolean(entry[1]),
-    ),
-  ).toString();
+const query = (params: Record<string, string | number | undefined>) => {
+  const searchParams = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    if (value !== undefined && value !== "") searchParams.set(key, String(value));
+  }
+  return searchParams.toString();
+};
 export function listTasks(
-  params: { search?: string; status?: TaskStatus } = {},
+  params: { search?: string; status?: TaskStatus; project_id?: string; page_size?: number } = {},
 ): Promise<TaskPage> {
   return authedFetch(`/tasks?${query(params)}`);
 }

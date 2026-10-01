@@ -169,6 +169,9 @@ class ProjectRepository(BaseRepository):
         return True
 
     def is_project_member(self, project_id: uuid.UUID, user_id: uuid.UUID) -> bool:
+        active_user = self.db.query(User.id).filter(User.id == user_id, User.is_active.is_(True)).first()
+        if active_user is None:
+            return False
         project = self.db.query(Project).filter(Project.id == project_id).first()
         if project is None:
             return False

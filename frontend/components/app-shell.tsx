@@ -1,13 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { Activity, CheckSquare, FolderOpen, LayoutDashboard, Sparkles, UsersRound, TriangleAlert, ChevronRight, UserCog } from "lucide-react";
+import { Activity, CheckSquare, FolderOpen, LayoutDashboard, Sparkles, UsersRound, TriangleAlert, ChevronRight, UserCog, CircleAlert } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { updateMyProfile } from "@/lib/users-api";
 import { ApiError } from "@/lib/api-client";
 import { useState, type FormEvent } from "react";
 
-export type NavKey = "dashboard" | "projects" | "tasks" | "updates" | "team" | "users" | "blockers" | "activity";
+export type NavKey = "dashboard" | "projects" | "tasks" | "updates" | "team" | "users" | "blockers" | "issues" | "activity";
 
 const NAV_ITEMS: { key: NavKey | "disabled"; label: string; icon: typeof LayoutDashboard; href?: string; permission?: string; anyPermissions?: string[] }[] = [
   { key: "dashboard", label: "Dashboard", icon: LayoutDashboard, href: "/dashboard" },
@@ -16,7 +16,8 @@ const NAV_ITEMS: { key: NavKey | "disabled"; label: string; icon: typeof LayoutD
   { key: "updates", label: "Updates", icon: Sparkles, href: "/updates" },
   { key: "team", label: "Team", icon: UsersRound, href: "/teams", anyPermissions: ["teams:manage", "project_teams:manage", "projects:view", "teams:view_own_roster"] },
   { key: "users", label: "Users", icon: UserCog, href: "/users", anyPermissions: ["users:request", "teams:view_own_roster"] },
-  { key: "blockers", label: "Raise Ticket", icon: TriangleAlert, href: "/blockers", permission: "projects:view" },
+  { key: "blockers", label: "Raise Ticket", icon: TriangleAlert, href: "/blockers", anyPermissions: ["projects:view", "projects:view_assigned"] },
+  { key: "issues", label: "Issues", icon: CircleAlert, href: "/issues", permission: "issues:view" },
   { key: "activity", label: "Activity", icon: Activity, href: "/activity", permission: "audit:view" },
   { key: "disabled", label: "AI Assistant", icon: Sparkles },
 ];

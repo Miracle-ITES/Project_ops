@@ -27,7 +27,7 @@ def _meta(page: int, page_size: int, total: int) -> PageMeta:
     return PageMeta(page=page, page_size=page_size, total=total, pages=math.ceil(total / page_size) if total else 0)
 
 
-def _task_query(db: Session, search: str | None, task_status: TaskStatus | None, assignee_id: uuid.UUID | None, user: User | None = None):
+def _task_query(db: Session, search: str | None, task_status: TaskStatus | None, assignee_id: uuid.UUID | None, user: User | None = None, project_id: uuid.UUID | None = None):
     query = db.query(Task).options(
         selectinload(Task.assignee),
         selectinload(Task.reviewer),
@@ -39,6 +39,8 @@ def _task_query(db: Session, search: str | None, task_status: TaskStatus | None,
         query = query.filter(Task.status == task_status)
     if assignee_id:
         query = query.filter(Task.assignee_id == assignee_id)
+    if project_id:
+        query = query.filter(Task.project_id == project_id)
     if user is not None:
         permissions = {permission.code for permission in user.role.permissions}
         if "users:manage" not in permissions and not ("projects:view" in permissions and "projects:create" not in permissions):
@@ -75,12 +77,13 @@ def list_tasks(
     search: str | None = None,
     task_status: TaskStatus | None = Query(default=None, alias="status"),
     assignee_id: uuid.UUID | None = None,
+    project_id: uuid.UUID | None = None,
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     db: Session = Depends(get_work_db),
     user: User = Depends(require_any_permission("projects:view", "projects:view_assigned")),
 ):
-    query = _task_query(db, search, task_status, assignee_id, user)
+    query = _task_query(db, search, task_status, assignee_id, user, project_id)
     total = query.count()
     items = query.offset((page - 1) * page_size).limit(page_size).all()
     return TaskPage(items=items, meta=_meta(page, page_size, total))

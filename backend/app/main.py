@@ -8,6 +8,7 @@ from app.api.users import router as users_router
 from app.api.blockers import router as blockers_router
 from app.api.activity import router as activity_router
 from app.api.work import router as work_router
+from app.api.issues import router as issues_router
 
 app = FastAPI()
 
@@ -26,6 +27,7 @@ app.include_router(activity_router)
 app.include_router(teams_router)
 app.include_router(projects_router)
 app.include_router(work_router)
+app.include_router(issues_router)
 
 @app.get("/health")
 def health():

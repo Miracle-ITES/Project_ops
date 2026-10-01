@@ -33,6 +33,9 @@ ALL_PERMISSIONS = {
     "daily_updates:submit": "Submit daily status updates",
     "learning:submit": "Submit learning progress",
     "blockers:raise": "Raise a ticket",
+    "issues:view": "View issues allowed by project and reporter scope",
+    "issues:raise": "Report issues on accessible projects",
+    "issues:manage": "Assign and manage issues on managed projects",
     "dashboards:view": "View dashboards",
     "projects:view": "View project data (read-only)",
     "projects:view_assigned": "View projects assigned to the user",
@@ -61,6 +64,7 @@ ROLE_DEFINITIONS = {
             "project_teams:manage",
             "learning_kt:manage", "work:view_assigned", "status:update",
             "daily_updates:submit", "dashboards:view", "projects:view", "reports:view",
+            "issues:view", "issues:raise", "issues:manage",
         },
     },
     "Member": {
@@ -73,11 +77,12 @@ ROLE_DEFINITIONS = {
             "work:view_assigned", "status:update", "daily_updates:submit",
             "teams:view_own_roster",
             "learning:submit", "blockers:raise", "dashboards:view", "projects:view_assigned",
+            "issues:view", "issues:raise",
         },
     },
     "Viewer/Auditor": {
         "description": "Read dashboards, projects, reports and permitted audit views. No mutation rights.",
-        "permissions": {"dashboards:view", "projects:view", "reports:view", "audit:view"},
+        "permissions": {"dashboards:view", "projects:view", "reports:view", "audit:view", "issues:view"},
     },
 }
 
