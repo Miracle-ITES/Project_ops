@@ -55,6 +55,12 @@ class UserRepository(BaseRepository):
         self.db.refresh(user)
         return user
 
+    def update_password(self, user: User, hashed_password: str) -> User:
+        user.hashed_password = hashed_password
+        self.db.commit()
+        self.db.refresh(user)
+        return user
+
     def update_profile(
         self, user: User, *, full_name: str, company_name: str | None = None,
         job_title: str | None = None, department: str | None = None,

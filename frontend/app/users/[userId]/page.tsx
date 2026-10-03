@@ -2,12 +2,12 @@
 
 import { useEffect, useState, type SubmitEventHandler } from "react";
 import Link from "next/link";
-import { ArrowLeft, UserCog } from "lucide-react";
+import { ArrowLeft, Eye, EyeOff, UserCog } from "lucide-react";
 import { useParams } from "next/navigation";
 import { RequireAuth } from "@/components/require-auth";
 import { AppShell } from "@/components/app-shell";
 import { ApiError } from "@/lib/api-client";
-import { changeUserRole, getUser, setUserActive, updateUserProfile } from "@/lib/users-api";
+import { changeUserPassword, changeUserRole, getUser, setUserActive, updateUserProfile } from "@/lib/users-api";
 import type { UserListItemOut } from "@/types/users";
 
 const ROLE_OPTIONS = ["Administrator", "Lead/Manager", "Member", "Viewer/Auditor"];
@@ -21,9 +21,15 @@ function UserDetailContent() {
     const [department, setDepartment] = useState("");
     const [phoneNumber, setPhoneNumber] = useState("");
     const [location, setLocation] = useState("");
+    const [password, setPassword] = useState("");
+    const [confirmPassword, setConfirmPassword] = useState("");
+    const [showPassword, setShowPassword] = useState(false);
+    const [showConfirmPassword, setShowConfirmPassword] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
     const [isAccessSaving, setIsAccessSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [passwordError, setPasswordError] = useState<string | null>(null);
+    const [passwordMessage, setPasswordMessage] = useState<string | null>(null);
 
     useEffect(() => {
         let cancelled = false;
@@ -89,6 +95,27 @@ function UserDetailContent() {
         }
     }
 
+    const handlePasswordChange: SubmitEventHandler<HTMLFormElement> = async (event) => {
+        event.preventDefault();
+        setPasswordError(null);
+        setPasswordMessage(null);
+        if (password !== confirmPassword) {
+            setPasswordError("Passwords do not match.");
+            return;
+        }
+        setIsAccessSaving(true);
+        try {
+            await changeUserPassword(userId, password);
+            setPassword("");
+            setConfirmPassword("");
+            setPasswordMessage("Password updated. The user will need to sign in again.");
+        } catch (err) {
+            setPasswordError(err instanceof ApiError ? err.message : err instanceof Error ? `Could not reach the API: ${err.message}` : "Failed to update password.");
+        } finally {
+            setIsAccessSaving(false);
+        }
+    };
+
     if (error) {
         return (
             <AppShell active="users" breadcrumb="User Not Found">
@@ -138,6 +165,27 @@ function UserDetailContent() {
                             <input value={location} onChange={(event) => setLocation(event.target.value)} placeholder="Location" className="min-w-0 rounded-lg border border-outline-variant px-3 py-2 text-sm focus:border-secondary focus:outline-none" />
                             <button type="submit" disabled={isSaving} className="w-full rounded-lg bg-primary px-4 py-2 text-sm font-medium text-on-primary disabled:opacity-50 sm:col-span-2">{isSaving ? "Saving..." : "Save profile"}</button>
                         </div>
+                    </form>
+                    <form onSubmit={handlePasswordChange} className="mt-6 border-t border-outline-variant/40 pt-6">
+                        <h2 className="font-headline-md text-headline-md font-bold text-on-surface">Change password</h2>
+                        <p className="mt-1 text-sm text-on-surface-variant">Set a new password for this account. Existing sessions will expire and need to sign in again.</p>
+                        <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                            <div className="relative">
+                                <input type={showPassword ? "text" : "password"} required minLength={8} maxLength={72} autoComplete="new-password" value={password} onChange={(event) => setPassword(event.target.value)} placeholder="New password" className="w-full min-w-0 rounded-lg border border-outline-variant py-2 pl-3 pr-10 text-sm focus:border-secondary focus:outline-none" />
+                                <button type="button" onClick={() => setShowPassword((visible) => !visible)} aria-label={showPassword ? "Hide new password" : "Show new password"} aria-pressed={showPassword} className="absolute inset-y-0 right-0 flex items-center px-3 text-on-surface-variant hover:text-secondary">
+                                    {showPassword ? <EyeOff size={16} aria-hidden="true" /> : <Eye size={16} aria-hidden="true" />}
+                                </button>
+                            </div>
+                            <div className="relative">
+                                <input type={showConfirmPassword ? "text" : "password"} required minLength={8} maxLength={72} autoComplete="new-password" value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} placeholder="Confirm new password" className="w-full min-w-0 rounded-lg border border-outline-variant py-2 pl-3 pr-10 text-sm focus:border-secondary focus:outline-none" />
+                                <button type="button" onClick={() => setShowConfirmPassword((visible) => !visible)} aria-label={showConfirmPassword ? "Hide confirmation password" : "Show confirmation password"} aria-pressed={showConfirmPassword} className="absolute inset-y-0 right-0 flex items-center px-3 text-on-surface-variant hover:text-secondary">
+                                    {showConfirmPassword ? <EyeOff size={16} aria-hidden="true" /> : <Eye size={16} aria-hidden="true" />}
+                                </button>
+                            </div>
+                            <button type="submit" disabled={isAccessSaving} className="w-full rounded-lg bg-secondary px-4 py-2 text-sm font-medium text-on-secondary disabled:opacity-50 sm:col-span-2">{isAccessSaving ? "Updating..." : "Update password"}</button>
+                        </div>
+                        {passwordError && <p role="alert" className="mt-3 text-sm text-error">{passwordError}</p>}
+                        {passwordMessage && <p role="status" className="mt-3 text-sm text-secondary">{passwordMessage}</p>}
                     </form>
                     {user.role.name !== "Administrator" && <section className="mt-6 border-t border-outline-variant/40 pt-6">
                         <h2 className="font-headline-md text-headline-md font-bold text-on-surface">Access management</h2>
