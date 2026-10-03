@@ -6,13 +6,13 @@ import { AppShell } from "@/components/app-shell";
 import { RequireAuth } from "@/components/require-auth";
 import { useAuth } from "@/lib/auth-context";
 import { listProjectMembers, listProjects } from "@/lib/projects-api";
-import { createTask, listTasks, updateTask } from "@/lib/work-api";
+import { createTask, deleteTask, listTaskAssignees, listTasks, updateTask } from "@/lib/work-api";
 import { reportTaskIssue } from "@/lib/issues-api";
 import { ApiError } from "@/lib/api-client";
 import { Dialog } from "@/components/dialog";
 import type { ContributorOut, ProjectListItemOut } from "@/types/projects";
 import type { IssuePriority } from "@/types/issues";
-import type { Task, TaskPriority, TaskStatus } from "@/types/work";
+import type { Task, TaskPriority, TaskStatus, UserBrief } from "@/types/work";
 
 const columns: { status: TaskStatus; label: string }[] = [
     { status: "backlog", label: "To Do" },
@@ -32,10 +32,21 @@ function TasksContent() {
     const canAssignTasks = hasPermission("tasks:assign");
     const canUpdateAssignedTasks = hasPermission("status:update");
     const canRaiseIssues = hasPermission("issues:raise");
+    const canFilterByUser = hasPermission("users:manage") || hasPermission("projects:create") || hasPermission("projects:view");
+    const projectFilterLabel = hasPermission("users:manage")
+        ? "All projects"
+        : hasPermission("projects:create")
+            ? "All my projects"
+            : hasPermission("projects:view_assigned")
+                ? "All assigned projects"
+                : "All projects";
     const [tasks, setTasks] = useState<Task[]>([]);
     const [projects, setProjects] = useState<ProjectListItemOut[]>([]);
+    const [taskAssignees, setTaskAssignees] = useState<UserBrief[]>([]);
     const [projectMembers, setProjectMembers] = useState<Record<string, ContributorOut[]>>({});
     const [search, setSearch] = useState("");
+    const [filterProjectId, setFilterProjectId] = useState("");
+    const [filterAssigneeId, setFilterAssigneeId] = useState("");
     const [title, setTitle] = useState("");
     const [priority, setPriority] = useState<TaskPriority>("medium");
     const [projectId, setProjectId] = useState("");
@@ -53,22 +64,50 @@ function TasksContent() {
     const [issueDueDate, setIssueDueDate] = useState("");
     const [issueError, setIssueError] = useState<string | null>(null);
     const [issueSaving, setIssueSaving] = useState(false);
+    const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
+    const [editTaskTitle, setEditTaskTitle] = useState("");
+    const [editTaskDescription, setEditTaskDescription] = useState("");
+    const [editTaskPriority, setEditTaskPriority] = useState<TaskPriority>("medium");
+    const [editTaskDueDate, setEditTaskDueDate] = useState("");
+    const [editTaskAssigneeId, setEditTaskAssigneeId] = useState("");
     useEffect(() => {
-        void listTasks({ search: search || undefined })
+        void listTasks({
+            search: search || undefined,
+            project_id: filterProjectId || undefined,
+            assignee_id: filterAssigneeId || undefined,
+        })
             .then((page) => setTasks(page.items))
             .catch(() => setError("Could not load tasks."));
-    }, [search]);
+    }, [search, filterProjectId, filterAssigneeId]);
     useEffect(() => {
         void listProjects()
             .then(setProjects)
             .catch(() => setError("Could not load projects."));
     }, []);
     useEffect(() => {
-        if (!canAssignTasks || projects.length === 0) return;
-        void Promise.all(projects.map(async (project) => [project.id, await listProjectMembers(project.id)] as const))
-            .then((entries) => setProjectMembers(Object.fromEntries(entries)))
-            .catch(() => setError("Could not load project members."));
-    }, [projects, canAssignTasks]);
+        if (!canFilterByUser) return;
+        void listTaskAssignees()
+            .then(setTaskAssignees)
+            .catch(() => setError("Could not load task assignees."));
+    }, [canFilterByUser]);
+    useEffect(() => {
+        if (!canAssignTasks) return;
+        const relevantProjectIds = [...new Set([
+            ...tasks.map((task) => task.project_id),
+            projectId || null,
+        ].filter((id): id is string => Boolean(id)))];
+        const missingProjectIds = relevantProjectIds.filter((id) => !(id in projectMembers));
+        if (missingProjectIds.length === 0) return;
+        let cancelled = false;
+        void Promise.all(missingProjectIds.map(async (id) => [id, await listProjectMembers(id)] as const))
+            .then((entries) => {
+                if (!cancelled) setProjectMembers((current) => ({ ...current, ...Object.fromEntries(entries) }));
+            })
+            .catch(() => {
+                if (!cancelled) setError("Could not load project members.");
+            });
+        return () => { cancelled = true; };
+    }, [tasks, projectId, projectMembers, canAssignTasks]);
     async function addTask(event: React.FormEvent) {
         event.preventDefault();
         if (!title.trim()) return;
@@ -84,7 +123,11 @@ function TasksContent() {
             setProjectId("");
             setAssigneeId("");
             setShowForm(false);
-            const page = await listTasks({ search: search || undefined });
+            const page = await listTasks({
+                search: search || undefined,
+                project_id: filterProjectId || undefined,
+                assignee_id: filterAssigneeId || undefined,
+            });
             setTasks(page.items);
         } catch {
             setError("Could not create task.");
@@ -141,6 +184,40 @@ function TasksContent() {
     function canMoveTask(task: Task) {
         return canCreateTasks || (canUpdateAssignedTasks && task.assignee?.id === user?.id);
     }
+    function startEditingTask(task: Task) {
+        setEditingTaskId(task.id);
+        setEditTaskTitle(task.title);
+        setEditTaskDescription(task.description || "");
+        setEditTaskPriority(task.priority);
+        setEditTaskDueDate(task.due_date || "");
+        setEditTaskAssigneeId(task.assignee?.id || "");
+    }
+    async function saveTask(event: React.FormEvent<HTMLFormElement>, taskId: string) {
+        event.preventDefault();
+        try {
+            const changes = {
+                title: editTaskTitle.trim(),
+                description: editTaskDescription || null,
+                priority: editTaskPriority,
+                due_date: editTaskDueDate || null,
+                ...(canAssignTasks ? { assignee_id: editTaskAssigneeId || null } : {}),
+            };
+            const updated = await updateTask(taskId, changes);
+            setTasks((current) => current.map((task) => task.id === updated.id ? updated : task));
+            setEditingTaskId(null);
+        } catch {
+            setError("Could not update task.");
+        }
+    }
+    async function removeTask(task: Task) {
+        if (!window.confirm(`Delete task “${task.title}”?`)) return;
+        try {
+            await deleteTask(task.id);
+            setTasks((current) => current.filter((item) => item.id !== task.id));
+        } catch {
+            setError("Could not delete task.");
+        }
+    }
     const projectNames = new Map(projects.map((project) => [project.id, project.name]));
     return (
         <AppShell active="tasks" breadcrumb="Tasks">
@@ -157,13 +234,33 @@ function TasksContent() {
                             <p className="mt-1 text-sm text-on-surface-variant">You can update the status of tasks assigned to you.</p>
                         )}
                     </div>
-                    <div className="flex gap-2">
+                    <div className="flex flex-wrap gap-2">
                         <input
                             value={search}
                             onChange={(event) => setSearch(event.target.value)}
                             placeholder="Search tasks"
                             className="rounded-lg border border-outline-variant bg-surface-container-lowest px-3 py-2 text-sm"
                         />
+                        <select
+                            aria-label="Filter tasks by project"
+                            value={filterProjectId}
+                            onChange={(event) => setFilterProjectId(event.target.value)}
+                            className="min-w-44 rounded-lg border border-outline-variant bg-surface-container-lowest px-3 py-2 text-sm"
+                        >
+                            <option value="">{projectFilterLabel}</option>
+                            {projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}
+                        </select>
+                        {canFilterByUser && (
+                            <select
+                                aria-label="Filter tasks by assignee"
+                                value={filterAssigneeId}
+                                onChange={(event) => setFilterAssigneeId(event.target.value)}
+                                className="min-w-44 rounded-lg border border-outline-variant bg-surface-container-lowest px-3 py-2 text-sm"
+                            >
+                                <option value="">All users</option>
+                                {taskAssignees.map((assignee) => <option key={assignee.id} value={assignee.id}>{assignee.full_name || assignee.email}</option>)}
+                            </select>
+                        )}
                         {canCreateTasks && (
                             <button
                                 onClick={() => setShowForm((value) => !value)}
@@ -349,30 +446,6 @@ function TasksContent() {
                                                     </span>
                                                 )}
                                             </div>
-                                            {canCreateTasks && canAssignTasks && task.project_id && (
-                                                <label className="mt-3 flex items-center gap-2 text-xs text-on-surface-variant">
-                                                    Assign to
-                                                    <select
-                                                        aria-label={`Assign ${task.title}`}
-                                                        value={task.assignee?.id || ""}
-                                                        onChange={async (event) => {
-                                                            const assigneeId = event.target.value || null;
-                                                            try {
-                                                                const updated = await updateTask(task.id, { assignee_id: assigneeId });
-                                                                setTasks((current) => current.map((item) => item.id === updated.id ? updated : item));
-                                                            } catch {
-                                                                setError("Could not update task assignment.");
-                                                            }
-                                                        }}
-                                                        className="rounded-lg border border-outline-variant bg-surface-container-lowest px-2 py-1"
-                                                    >
-                                                        <option value="">Unassigned</option>
-                                                        {(projectMembers[task.project_id] || []).map((member) => (
-                                                            <option key={member.user_id} value={member.user_id}>{member.full_name || member.email}</option>
-                                                        ))}
-                                                    </select>
-                                                </label>
-                                            )}
                                             {canMoveTask(task) && <div className="mt-3 flex gap-2">
                                                 {column.status !== "backlog" && (
                                                     <button
@@ -399,9 +472,34 @@ function TasksContent() {
                                                     </button>
                                                 )}
                                             </div>}
-                                            {canRaiseIssues && task.project_id && <div className="mt-3 border-t border-outline-variant pt-3">
-                                                <button type="button" onClick={() => { setReportingTaskId(task.id); setIssueTitle(task.title); setIssueDescription(""); setIssueCategory("general"); setIssuePriority("medium"); setIssueSeverity("medium"); setIssueDueDate(""); setIssueError(null); }} className="text-xs font-semibold text-secondary hover:underline">Report issue</button>
+                                            {(canCreateTasks || (canRaiseIssues && task.project_id)) && <div className="mt-3 flex items-center justify-between border-t border-outline-variant pt-3">
+                                                {canRaiseIssues && task.project_id ? <button type="button" onClick={() => { setReportingTaskId(task.id); setIssueTitle(task.title); setIssueDescription(""); setIssueCategory("general"); setIssuePriority("medium"); setIssueSeverity("medium"); setIssueDueDate(""); setIssueError(null); }} className="text-xs font-semibold text-secondary hover:underline">Report issue</button> : <span />}
+                                                {canCreateTasks && <div className="flex gap-2">
+                                                    <button type="button" onClick={() => startEditingTask(task)} className="rounded-lg border border-outline-variant px-3 py-1.5 text-xs font-semibold text-on-surface hover:border-secondary hover:text-secondary">Edit</button>
+                                                    <button type="button" onClick={() => void removeTask(task)} className="rounded-lg border border-error/40 px-3 py-1.5 text-xs font-semibold text-error hover:border-error">Delete</button>
+                                                </div>}
                                             </div>}
+                                            {editingTaskId === task.id && <form onSubmit={(event) => void saveTask(event, task.id)} className="mt-3 space-y-2 border-t border-outline-variant pt-3">
+                                                <input required maxLength={200} value={editTaskTitle} onChange={(event) => setEditTaskTitle(event.target.value)} aria-label="Task title" className="w-full rounded-lg border border-outline-variant px-3 py-2 text-sm" />
+                                                <textarea value={editTaskDescription} onChange={(event) => setEditTaskDescription(event.target.value)} aria-label="Task description" placeholder="Description" rows={2} className="w-full rounded-lg border border-outline-variant px-3 py-2 text-sm" />
+                                                <div className="grid grid-cols-2 gap-2">
+                                                    <select value={editTaskPriority} onChange={(event) => setEditTaskPriority(event.target.value as TaskPriority)} aria-label="Task priority" className="rounded-lg border border-outline-variant px-2 py-2 text-sm">
+                                                        <option value="low">Low priority</option><option value="medium">Medium priority</option><option value="high">High priority</option><option value="critical">Critical priority</option>
+                                                    </select>
+                                                    <input type="date" value={editTaskDueDate} onChange={(event) => setEditTaskDueDate(event.target.value)} aria-label="Task due date" className="rounded-lg border border-outline-variant px-2 py-2 text-sm" />
+                                                </div>
+                                                {canAssignTasks && task.project_id && <label className="block space-y-1 text-xs font-medium text-on-surface-variant">
+                                                    <span>Assign to</span>
+                                                    <select value={editTaskAssigneeId} onChange={(event) => setEditTaskAssigneeId(event.target.value)} aria-label={`Assign ${task.title}`} className="w-full rounded-lg border border-outline-variant bg-surface-container-lowest px-3 py-2 text-sm">
+                                                        <option value="">Unassigned</option>
+                                                        {(projectMembers[task.project_id] || []).map((member) => <option key={member.user_id} value={member.user_id}>{member.full_name || member.email}</option>)}
+                                                    </select>
+                                                </label>}
+                                                <div className="flex justify-end gap-2">
+                                                    <button type="button" onClick={() => setEditingTaskId(null)} className="rounded-lg border border-outline-variant px-3 py-1.5 text-xs">Cancel</button>
+                                                    <button type="submit" className="rounded-lg bg-secondary px-3 py-1.5 text-xs font-semibold text-on-secondary">Save</button>
+                                                </div>
+                                            </form>}
                                         </article>
                                     ))}
                             </div>

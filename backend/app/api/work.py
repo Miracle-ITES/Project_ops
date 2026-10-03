@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session, joinedload, selectinload
 from app.api.deps import get_project_service, get_work_db, require_any_permission, require_permission
 from app.api.schemas.work import (
     DailyUpdateCreate, DailyUpdateOut, DailyUpdatePage, DashboardDeadlineOut, DashboardOut, LearningCreate,
-    LearningOut, LearningPage, LearningUpdate, PageMeta, TaskCreate, TaskOut, TaskPage,
+    LearningOut, LearningPage, LearningUpdate, PageMeta, TaskCreate, TaskOut, TaskPage, UserBrief,
     TaskUpdate,
 )
 from app.domain.project import Blocker, BlockerStatus, Milestone, MilestoneStatus, Project, ProjectContributor, ProjectMaturity, ProjectPriority, ProjectTeam
@@ -25,6 +25,36 @@ router = APIRouter(tags=["work management"])
 
 def _meta(page: int, page_size: int, total: int) -> PageMeta:
     return PageMeta(page=page, page_size=page_size, total=total, pages=math.ceil(total / page_size) if total else 0)
+
+
+def _task_visibility(db: Session, user: User):
+    permissions = {permission.code for permission in user.role.permissions}
+    if "users:manage" in permissions or ("projects:view" in permissions and "projects:create" not in permissions):
+        return None, False
+
+    project_ids = db.query(Project.id)
+    if "projects:create" in permissions:
+        project_ids = project_ids.filter(Project.owner_id == user.id)
+    elif "projects:view_assigned" in permissions:
+        team_ids = db.query(TeamMembership.team_id).filter(
+            TeamMembership.user_id == user.id,
+            TeamMembership.left_at.is_(None),
+            or_(TeamMembership.end_date.is_(None), TeamMembership.end_date >= date.today()),
+        )
+        contributor_projects = db.query(ProjectContributor.project_id).filter(
+            ProjectContributor.user_id == user.id,
+            ProjectContributor.removed_at.is_(None),
+            or_(ProjectContributor.end_date.is_(None), ProjectContributor.end_date >= date.today()),
+        )
+        team_projects = db.query(ProjectTeam.project_id).filter(ProjectTeam.team_id.in_(team_ids))
+        project_ids = project_ids.filter(or_(
+            Project.owner_id == user.id,
+            Project.id.in_(contributor_projects),
+            Project.id.in_(team_projects),
+        ))
+    else:
+        project_ids = project_ids.filter(False)
+    return project_ids, "projects:view_assigned" in permissions and "projects:create" not in permissions
 
 
 def _task_query(db: Session, search: str | None, task_status: TaskStatus | None, assignee_id: uuid.UUID | None, user: User | None = None, project_id: uuid.UUID | None = None):
@@ -42,34 +72,26 @@ def _task_query(db: Session, search: str | None, task_status: TaskStatus | None,
     if project_id:
         query = query.filter(Task.project_id == project_id)
     if user is not None:
-        permissions = {permission.code for permission in user.role.permissions}
-        if "users:manage" not in permissions and not ("projects:view" in permissions and "projects:create" not in permissions):
-            project_ids = db.query(Project.id)
-            if "projects:create" in permissions:
-                project_ids = project_ids.filter(Project.owner_id == user.id)
-            elif "projects:view_assigned" in permissions:
-                team_ids = db.query(TeamMembership.team_id).filter(
-                    TeamMembership.user_id == user.id,
-                    TeamMembership.left_at.is_(None),
-                    or_(TeamMembership.end_date.is_(None), TeamMembership.end_date >= date.today()),
-                )
-                contributor_projects = db.query(ProjectContributor.project_id).filter(
-                    ProjectContributor.user_id == user.id,
-                    ProjectContributor.removed_at.is_(None),
-                    or_(ProjectContributor.end_date.is_(None), ProjectContributor.end_date >= date.today()),
-                )
-                team_projects = db.query(ProjectTeam.project_id).filter(ProjectTeam.team_id.in_(team_ids))
-                project_ids = project_ids.filter(or_(
-                    Project.owner_id == user.id,
-                    Project.id.in_(contributor_projects),
-                    Project.id.in_(team_projects),
-                ))
-            else:
-                project_ids = project_ids.filter(False)
+        project_ids, assigned_only = _task_visibility(db, user)
+        if project_ids is not None:
             query = query.filter(Task.project_id.in_(project_ids))
-            if "projects:view_assigned" in permissions and "projects:create" not in permissions:
-                query = query.filter(Task.assignee_id == user.id)
+        if assigned_only:
+            query = query.filter(Task.assignee_id == user.id)
     return query.order_by(Task.created_at.desc())
+
+
+@router.get("/tasks/assignees", response_model=list[UserBrief])
+def list_task_assignees(
+    db: Session = Depends(get_work_db),
+    user: User = Depends(require_any_permission("projects:view", "projects:view_assigned")),
+):
+    query = db.query(User).join(Task, Task.assignee_id == User.id)
+    project_ids, assigned_only = _task_visibility(db, user)
+    if project_ids is not None:
+        query = query.filter(Task.project_id.in_(project_ids))
+    if assigned_only:
+        query = query.filter(Task.assignee_id == user.id)
+    return query.distinct().order_by(User.full_name, User.email).all()
 
 
 @router.get("/tasks", response_model=TaskPage)
