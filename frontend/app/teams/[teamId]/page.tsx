@@ -77,8 +77,7 @@ function RosterContent() {
     setError(null);
     setIsSubmitting(true);
     try {
-      if (!endDate) return;
-      await addMember(teamId, selectedUserId, endDate);
+      await addMember(teamId, selectedUserId, endDate || undefined);
       setSelectedUserId("");
       setEndDate("");
       await load();
@@ -123,8 +122,8 @@ function RosterContent() {
 
   return (
     <AppShell active="team" breadcrumb={roster.team.name}>
-      <div className="px-gutter-lg py-space-lg max-w-4xl">
-        <div className="mb-6 flex items-center justify-between">
+      <div className="px-4 sm:px-gutter-lg py-space-lg max-w-4xl">
+        <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h1 className="font-headline-xl text-headline-xl text-on-surface font-bold tracking-tight">
               {roster.team.name}
@@ -157,12 +156,12 @@ function RosterContent() {
               ))}
             </select>
           </label>
-          <label htmlFor="team-member-end-date" className="text-xs font-semibold text-outline">Membership ends on
-            <input id="team-member-end-date" type="date" required min={todayInputDate()} value={endDate} onChange={(event) => setEndDate(event.target.value)} className="mt-1 block w-full rounded-lg border border-outline-variant px-3 py-2 text-sm font-normal text-on-surface focus:border-secondary focus:outline-none" />
+          <label htmlFor="team-member-end-date" className="text-xs font-semibold text-outline">Membership ends on (optional)
+            <input id="team-member-end-date" type="date" min={todayInputDate()} value={endDate} onChange={(event) => setEndDate(event.target.value)} className="mt-1 block w-full rounded-lg border border-outline-variant px-3 py-2 text-sm font-normal text-on-surface focus:border-secondary focus:outline-none" />
           </label>
           <button
             type="submit"
-            disabled={isSubmitting || !selectedUserId || !endDate}
+            disabled={isSubmitting || !selectedUserId}
             className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-on-primary hover:bg-primary-container disabled:opacity-50"
           >
             {isSubmitting ? "Adding..." : "Add member"}

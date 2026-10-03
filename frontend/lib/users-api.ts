@@ -118,3 +118,11 @@ export function setUserActive(
     body: JSON.stringify({ is_active: isActive }),
   });
 }
+
+export function changeUserPassword(userId: string, password: string): Promise<void> {
+  return authedFetch<void>(`/users/${userId}/password`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ password }),
+  });
+}

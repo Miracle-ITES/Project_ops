@@ -116,8 +116,9 @@ def get_blocker_service(
 def get_user_service(
     users: UserRepository = Depends(get_user_repository),
     roles: RoleRepository = Depends(get_role_repository),
+    tokens: RefreshTokenRepository = Depends(get_token_repository),
 ) -> UserService:
-    return UserService(users, roles)
+    return UserService(users, roles, tokens)
 
 
 # --- Authentication ---

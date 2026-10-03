@@ -4,6 +4,7 @@ import string
 
 from app.domain.user import User
 from app.repositories.role_repository import RoleRepository
+from app.repositories.token_repository import RefreshTokenRepository
 from app.repositories.user_repository import UserRepository
 from app.services.security import hash_password
 from app.services.email_service import send_invitation_email
@@ -22,9 +23,10 @@ class UserService:
     self-registration.
     """
 
-    def __init__(self, users: UserRepository, roles: RoleRepository):
+    def __init__(self, users: UserRepository, roles: RoleRepository, tokens: RefreshTokenRepository):
         self.users = users
         self.roles = roles
+        self.tokens = tokens
 
     def invite_user(self, *, email: str, full_name: str | None, role_name: str) -> User:
         if self.users.get_by_email(email):
@@ -76,3 +78,9 @@ class UserService:
     def set_active(self, user_id: uuid.UUID, is_active: bool) -> User:
         user = self.get_user(user_id)
         return self.users.set_active(user, is_active)
+
+    def change_password(self, user_id: uuid.UUID, password: str) -> User:
+        user = self.get_user(user_id)
+        updated_user = self.users.update_password(user, hash_password(password))
+        self.tokens.revoke_all_for_user(user.id)
+        return updated_user

@@ -1,12 +1,12 @@
 import uuid
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session, joinedload
 
 from app.api.deps import get_audit_repository, get_current_user, get_db, get_user_service, require_any_permission, require_permission
 from app.api.schemas.invitations import InvitationRequestOut, InvitationReviewRequest
-from app.api.schemas.users import UserActiveChangeRequest, UserCreateRequest, UserListItemOut, UserProfileUpdateRequest, UserRoleChangeRequest
+from app.api.schemas.users import UserActiveChangeRequest, UserCreateRequest, UserListItemOut, UserPasswordChangeRequest, UserProfileUpdateRequest, UserRoleChangeRequest
 from app.domain.invitation import InvitationRequest, InvitationRequestStatus
 from app.domain.user import User
 from app.repositories.audit_repository import AuditLogRepository
@@ -224,3 +224,24 @@ def set_active(
         return _to_out(user_service.set_active(user_id, payload.is_active))
     except UserServiceError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=exc.message)
+
+
+@router.patch("/{user_id}/password", status_code=status.HTTP_204_NO_CONTENT)
+def change_password(
+    user_id: uuid.UUID,
+    payload: UserPasswordChangeRequest,
+    request: Request,
+    user_service: UserService = Depends(get_user_service),
+    admin: User = Depends(require_permission("users:manage", revalidate_from_db=True)),
+    audit: AuditLogRepository = Depends(get_audit_repository),
+):
+    try:
+        user = user_service.change_password(user_id, payload.password)
+    except UserServiceError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=exc.message)
+    audit.record(
+        user_id=admin.id,
+        action="user_password_changed",
+        detail=f"Changed password for {user.email}",
+        ip_address=request.client.host if request.client else None,
+    )

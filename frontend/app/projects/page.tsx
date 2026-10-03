@@ -131,7 +131,7 @@ function ProjectsContent() {
 
   return (
     <AppShell active="projects" breadcrumb="Projects Directory">
-      <div className="px-gutter-lg py-space-lg">
+      <div className="px-4 sm:px-gutter-lg py-space-lg">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-space-md mb-space-lg">
           <div>
             <h1 className="font-headline-xl text-headline-xl text-on-surface font-bold tracking-tight">

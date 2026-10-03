@@ -5,7 +5,7 @@ import { AppShell } from "@/components/app-shell";
 import { RequireAuth } from "@/components/require-auth";
 import { Dialog } from "@/components/dialog";
 import { useAuth } from "@/lib/auth-context";
-import { createLearning, listDailyUpdates, listLearning, submitDailyUpdate, updateLearning } from "@/lib/work-api";
+import { createLearning, deleteLearning, listDailyUpdates, listLearning, submitDailyUpdate, updateLearning } from "@/lib/work-api";
 import type { DailyUpdate, LearningItem, LearningStatus } from "@/types/work";
 
 export default function UpdatesPage() {
@@ -26,6 +26,9 @@ export default function UpdatesPage() {
     const [updateDate, setUpdateDate] = useState(today);
     const [topic, setTopic] = useState("");
     const [sessionDate, setSessionDate] = useState(today);
+    const [editingLearningId, setEditingLearningId] = useState<string | null>(null);
+    const [editTopic, setEditTopic] = useState("");
+    const [editSessionDate, setEditSessionDate] = useState("");
     const [error, setError] = useState<string | null>(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const reload = useCallback(async () => {
@@ -73,8 +76,33 @@ export default function UpdatesPage() {
             setError("Could not add learning item.");
         }
     }
+    function startEditingLearning(item: LearningItem) {
+        setEditingLearningId(item.id);
+        setEditTopic(item.topic);
+        setEditSessionDate(item.session_date || "");
+    }
+    async function saveLearning(event: React.FormEvent<HTMLFormElement>, itemId: string) {
+        event.preventDefault();
+        try {
+            await updateLearning(itemId, { topic: editTopic.trim(), session_date: editSessionDate || null });
+            setEditingLearningId(null);
+            await reload();
+        } catch {
+            setError("Could not update learning item.");
+        }
+    }
+    async function removeLearning(item: LearningItem) {
+        if (!window.confirm(`Delete the KT session “${item.topic}”?`)) return;
+        try {
+            await deleteLearning(item.id);
+            if (editingLearningId === item.id) setEditingLearningId(null);
+            await reload();
+        } catch {
+            setError("Could not delete learning item.");
+        }
+    }
     return <RequireAuth><AppShell active="updates" breadcrumb="Daily Updates & Learning">
-        <div className="max-w-6xl px-gutter-lg py-space-lg">
+        <div className="max-w-6xl px-4 sm:px-gutter-lg py-space-lg">
             <h1 className="font-headline-xl text-headline-xl font-bold text-on-surface">
                 Daily updates & learning
             </h1>
@@ -163,17 +191,32 @@ export default function UpdatesPage() {
                             Add
                         </button>
                     </form>}
-                    <div className="mt-5 space-y-3">{learning.map((item) => <div key={item.id} className="flex items-center justify-between gap-3 border-t border-outline-variant/40 pt-3">
-                        <div>
-                            <p className="font-semibold text-on-surface">{item.topic}</p>
-                            <p className="text-xs text-outline">{item.owner.full_name || item.owner.email}</p>
-                            <p className="mt-1 text-xs text-on-surface-variant">KT session date: {item.session_date ? new Date(`${item.session_date}T00:00:00`).toLocaleDateString() : "Not scheduled"}</p>
-                        </div>
-                        {canManageLearning ? <select value={item.status} onChange={(event) => updateLearning(item.id, event.target.value as LearningStatus).then(reload)} className="rounded-lg border border-outline-variant px-2 py-1 text-xs">
-                            <option value="planned">Planned</option>
-                            <option value="in_progress">In progress</option>
-                            <option value="completed">Completed</option>
-                        </select> : <span className="text-xs capitalize text-on-surface-variant">{item.status.replace("_", " ")}</span>}
+                    <div className="mt-5 space-y-3">{learning.map((item) => <div key={item.id} className="border-t border-outline-variant/40 pt-3">
+                        {editingLearningId === item.id ? <form onSubmit={(event) => void saveLearning(event, item.id)} className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto_auto]">
+                            <input required maxLength={200} value={editTopic} onChange={(event) => setEditTopic(event.target.value)} aria-label="KT session topic" className="min-w-0 rounded-lg border border-outline-variant px-3 py-2 text-sm" />
+                            <input type="date" value={editSessionDate} onChange={(event) => setEditSessionDate(event.target.value)} aria-label="KT session date" className="rounded-lg border border-outline-variant px-3 py-2 text-sm" />
+                            <div className="flex gap-2">
+                                <button type="button" onClick={() => setEditingLearningId(null)} className="rounded-lg border border-outline-variant px-3 py-2 text-sm">Cancel</button>
+                                <button type="submit" className="rounded-lg bg-secondary px-3 py-2 text-sm font-semibold text-on-secondary">Save</button>
+                            </div>
+                        </form> : <div className="flex flex-wrap items-center justify-between gap-3">
+                            <div>
+                                <p className="font-semibold text-on-surface">{item.topic}</p>
+                                <p className="text-xs text-outline">{item.owner.full_name || item.owner.email}</p>
+                                <p className="mt-1 text-xs text-on-surface-variant">KT session date: {item.session_date ? new Date(`${item.session_date}T00:00:00`).toLocaleDateString() : "Not scheduled"}</p>
+                            </div>
+                            <div className="flex flex-wrap items-center gap-2">
+                                {canManageLearning ? <>
+                                    {item.status === "completed" ? <span className="rounded-full bg-secondary-container px-2 py-1 text-xs font-semibold text-on-secondary-container">Completed · History</span> : <select aria-label={`Status for ${item.topic}`} value={item.status} onChange={(event) => updateLearning(item.id, { status: event.target.value as LearningStatus }).then(reload).catch(() => setError("Could not update learning item."))} className="rounded-lg border border-outline-variant px-2 py-1 text-xs">
+                                        <option value="planned">Planned</option>
+                                        <option value="in_progress">In progress</option>
+                                        <option value="completed">Completed</option>
+                                    </select>}
+                                    <button type="button" onClick={() => startEditingLearning(item)} className="rounded-lg border border-outline-variant px-3 py-1.5 text-xs font-semibold text-on-surface hover:border-secondary hover:text-secondary">Edit</button>
+                                    {item.status !== "completed" && <button type="button" onClick={() => void removeLearning(item)} className="rounded-lg border border-error/40 px-3 py-1.5 text-xs font-semibold text-error hover:border-error">Delete</button>}
+                                </> : <span className="text-xs capitalize text-on-surface-variant">{item.status.replace("_", " ")}</span>}
+                            </div>
+                        </div>}
                     </div>
                     )
                     }

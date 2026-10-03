@@ -47,7 +47,7 @@ function ProfileContent() {
     const fieldClass = "mt-2 w-full rounded-lg border border-outline-variant px-3 py-2 text-sm disabled:bg-surface-container-low disabled:text-on-surface-variant";
     return (
         <AppShell active="dashboard" breadcrumb="My Profile">
-            <div className="max-w-3xl px-gutter-lg py-space-lg">
+            <div className="max-w-3xl px-4 sm:px-gutter-lg py-space-lg">
                 <h1 className="font-headline-xl text-headline-xl font-bold text-on-surface">My Profile</h1>
                 <p className="mt-1 font-body-md text-body-md text-on-surface-variant">
                     {canManageProfile
@@ -55,7 +55,7 @@ function ProfileContent() {
                         : "Your profile is locked after first-login setup. Contact an administrator to change these details."}
                 </p>
                 {error && <p className="mt-4 rounded-lg bg-error-container px-3 py-2 text-sm text-on-error-container">{error}</p>}
-                <form onSubmit={saveProfile} className="mt-6 grid grid-cols-1 gap-4 rounded-xl bg-surface-container-lowest p-6 shadow-sm sm:grid-cols-2">
+                <form onSubmit={saveProfile} className="mt-6 grid grid-cols-1 gap-4 rounded-xl bg-surface-container-lowest p-4 shadow-sm sm:grid-cols-2 sm:p-6">
                     <label className="min-w-0 rounded-lg bg-surface-container-low p-4 text-xs font-semibold uppercase tracking-wider text-outline">
                         Full name
                         <input required value={fullName} onChange={(event) => setFullName(event.target.value)} disabled={!canManageProfile || isSaving} className={fieldClass} />

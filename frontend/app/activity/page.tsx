@@ -70,7 +70,7 @@ function ActivityContent() {
 
     return (
         <AppShell active="activity" breadcrumb="Activity">
-            <div className="max-w-5xl px-gutter-lg py-space-lg">
+            <div className="max-w-5xl px-4 sm:px-gutter-lg py-space-lg">
                 <div className="mb-6">
                     <h1 className="font-headline-xl text-headline-xl font-bold text-on-surface">Activity</h1>
                     <p className="mt-1 font-body-md text-body-md text-on-surface-variant">Recent authentication, security, issue, and administrative events.</p>

@@ -56,7 +56,7 @@ function DashboardContent() {
 
   return (
     <AppShell active="dashboard" breadcrumb="Executive Overview">
-      <div className="px-gutter-lg py-space-lg">
+      <div className="px-4 sm:px-gutter-lg py-space-lg">
         {loadError && <p role="alert" className="mb-4 rounded-lg bg-error-container px-3 py-2 text-sm text-on-error-container">{loadError}</p>}
         {/* Header row */}
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-space-md mb-space-lg">
@@ -220,10 +220,10 @@ function DashboardContent() {
                 <h2 className="font-headline-md text-headline-md font-bold text-on-surface">Active Tickets</h2>
               </div>
               <div className="space-y-space-sm mt-1">
-                <div className="p-3 rounded-lg bg-error-container/40">
+                <Link href="/blockers" aria-label={`View active tickets: ${metrics?.open_tickets ?? 0} tickets need attention`} className="block rounded-lg bg-error-container/40 p-3 transition hover:bg-error-container/70 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-error">
                   <p className="text-sm font-medium text-on-error-container">{metrics?.open_tickets ?? 0} tickets need attention</p>
                   <p className="mt-1 text-xs text-on-error-container/80">Live from the ticket register</p>
-                </div>
+                </Link>
               </div>
             </div>
           </div>

@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, field_validator
 
 from app.api.schemas.auth import RoleOut
 
@@ -18,6 +18,17 @@ class UserRoleChangeRequest(BaseModel):
 
 class UserActiveChangeRequest(BaseModel):
     is_active: bool
+
+
+class UserPasswordChangeRequest(BaseModel):
+    password: str = Field(min_length=8, max_length=72)
+
+    @field_validator("password")
+    @classmethod
+    def password_fits_bcrypt(cls, value: str) -> str:
+        if len(value.encode("utf-8")) > 72:
+            raise ValueError("Password must be no more than 72 UTF-8 bytes")
+        return value
 
 
 class UserProfileUpdateRequest(BaseModel):
