@@ -244,7 +244,10 @@ def update_learning(item_id: uuid.UUID, payload: LearningUpdate, db: Session = D
     item = db.query(LearningItem).get(item_id)
     if not item:
         raise HTTPException(status_code=404, detail="Learning item not found")
-    for field, value in payload.model_dump(exclude_unset=True).items():
+    changes = payload.model_dump(exclude_unset=True)
+    if item.status == LearningStatus.COMPLETED and changes.get("status", LearningStatus.COMPLETED) != LearningStatus.COMPLETED:
+        raise HTTPException(status_code=409, detail="Completed KT sessions are kept in history")
+    for field, value in changes.items():
         setattr(item, field, value)
     if item.status == LearningStatus.COMPLETED and item.completed_at is None:
         item.completed_at = datetime.utcnow()
@@ -253,6 +256,18 @@ def update_learning(item_id: uuid.UUID, payload: LearningUpdate, db: Session = D
     db.add(AuditLog(user_id=user.id, action="learning_updated", detail=item.topic))
     db.commit()
     return db.query(LearningItem).options(joinedload(LearningItem.owner)).get(item.id)
+
+
+@router.delete("/learning/{item_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_learning(item_id: uuid.UUID, db: Session = Depends(get_work_db), user: User = Depends(require_permission("projects:create", revalidate_from_db=True))):
+    item = db.query(LearningItem).get(item_id)
+    if not item:
+        raise HTTPException(status_code=404, detail="Learning item not found")
+    if item.status == LearningStatus.COMPLETED:
+        raise HTTPException(status_code=409, detail="Completed KT sessions are kept in history")
+    db.delete(item)
+    db.add(AuditLog(user_id=user.id, action="learning_deleted", detail=f"{item.topic} ({item.id})"))
+    db.commit()
 
 
 @router.get("/dashboard", response_model=DashboardOut)

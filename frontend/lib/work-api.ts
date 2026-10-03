@@ -99,11 +99,14 @@ export function createLearning(payload: {
 }
 export function updateLearning(
   id: string,
-  status: LearningStatus,
+  payload: Partial<{ topic: string; notes: string | null; status: LearningStatus; session_date: string | null }>,
 ): Promise<LearningItem> {
   return authedFetch(`/learning/${id}`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ status }),
+    body: JSON.stringify(payload),
   });
+}
+export function deleteLearning(id: string): Promise<void> {
+  return authedFetch(`/learning/${id}`, { method: "DELETE" });
 }
