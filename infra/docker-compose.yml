@@ -36,7 +36,6 @@ services:
     env_file:
       - ../backend/.env
     environment:
-      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/project_control_center
       REDIS_URL: redis://redis:6379/0
     depends_on:
       postgres:
