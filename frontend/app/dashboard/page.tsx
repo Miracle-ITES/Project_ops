@@ -94,12 +94,12 @@ function DashboardContent() {
             </span>
             <div className="mt-3 font-display-lg text-display-lg font-bold text-on-surface tracking-tight">{isLoading ? "…" : metrics?.tasks_due_today ?? 0}</div>
           </div>
-          <div className="p-4 rounded-xl bg-surface-container-lowest shadow-sm">
+          <Link href="/blockers" aria-label={`Open tickets: ${isLoading ? "loading" : metrics?.open_tickets ?? 0}. View tickets`} className="rounded-xl bg-surface-container-lowest p-4 shadow-sm transition hover:shadow-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-secondary">
             <span className="font-label-sm text-label-sm uppercase tracking-wider font-semibold text-outline">
               Open Tickets
             </span>
             <div className="mt-3 font-display-lg text-display-lg font-bold text-error tracking-tight">{isLoading ? "…" : metrics?.open_tickets ?? 0}</div>
-          </div>
+          </Link>
           {!isMember && <div className="p-4 rounded-xl bg-surface-container-lowest shadow-sm">
             <span className="font-label-sm text-label-sm uppercase tracking-wider font-semibold text-outline">
               Team Progress

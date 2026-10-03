@@ -173,7 +173,12 @@ export function AppShell({ active, breadcrumb, children }: AppShellProps) {
         <div className="flex min-w-0 items-center gap-space-xs text-on-surface-variant font-label-md text-label-md">
           <span className="hidden sm:inline">Operations</span>
           <ChevronRight size={16} className="hidden shrink-0 text-outline sm:block" aria-hidden="true" />
-          <span className="truncate font-semibold text-on-surface">{breadcrumb}</span>
+          {active === "dashboard" ? (
+            <span aria-label="Project Ops" title="Project Ops" className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-xs font-bold text-on-primary sm:hidden">PO</span>
+          ) : (
+            <span className="truncate font-semibold text-on-surface">{breadcrumb}</span>
+          )}
+          {active === "dashboard" && <span className="hidden font-semibold text-on-surface sm:inline">{breadcrumb}</span>}
         </div>
         <div className="ml-3 flex shrink-0 items-center gap-3 md:hidden">
           <Link href="/profile" aria-label="Open profile" className="flex h-8 w-8 items-center justify-center rounded-full bg-primary-container text-xs font-bold text-on-primary">{initials}</Link>
