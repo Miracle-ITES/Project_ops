@@ -134,12 +134,12 @@ function UserDetailContent() {
 
     return (
         <AppShell active="users" breadcrumb={user.full_name || user.email}>
-            <div className="max-w-3xl px-gutter-lg py-space-lg">
+            <div className="max-w-3xl px-4 sm:px-gutter-lg py-space-lg">
                 <Link href="/users" className="mb-6 inline-flex items-center gap-2 font-label-md text-label-md text-on-surface-variant hover:text-on-surface">
                     <ArrowLeft size={16} aria-hidden="true" />
                     Users
                 </Link>
-                <section className="rounded-xl bg-surface-container-lowest p-6 shadow-sm">
+                <section className="rounded-xl bg-surface-container-lowest p-4 shadow-sm sm:p-6">
                     <div className="flex items-start gap-4">
                         <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary-container text-on-primary">
                             <UserCog size={24} aria-hidden="true" />

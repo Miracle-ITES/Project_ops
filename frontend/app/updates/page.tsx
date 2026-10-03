@@ -102,7 +102,7 @@ export default function UpdatesPage() {
         }
     }
     return <RequireAuth><AppShell active="updates" breadcrumb="Daily Updates & Learning">
-        <div className="max-w-6xl px-gutter-lg py-space-lg">
+        <div className="max-w-6xl px-4 sm:px-gutter-lg py-space-lg">
             <h1 className="font-headline-xl text-headline-xl font-bold text-on-surface">
                 Daily updates & learning
             </h1>

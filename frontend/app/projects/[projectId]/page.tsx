@@ -202,11 +202,11 @@ function ProjectDetailContent() {
 
   return (
     <AppShell active="projects" breadcrumb={project.name}>
-      <div className="px-gutter-lg py-space-lg mx-auto w-full max-w-6xl">
-        <div className="mb-6 flex items-center justify-between">
+      <div className="px-4 sm:px-gutter-lg py-space-lg mx-auto w-full max-w-6xl">
+        <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <div className="flex items-center gap-3">
-              <h1 className="font-headline-xl text-headline-xl text-on-surface font-bold tracking-tight">
+            <div className="flex flex-wrap items-center gap-3">
+              <h1 className="break-words font-headline-xl text-headline-xl text-on-surface font-bold tracking-tight">
                 {project.name}
               </h1>
               <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full font-label-sm text-label-sm font-semibold ${badge.className}`}>
@@ -218,7 +218,7 @@ function ProjectDetailContent() {
               Owner: {project.owner.email} · <span className="capitalize">{project.priority}</span> priority
             </p>
           </div>
-          <Link href="/projects" className="font-label-md text-label-md text-on-surface-variant hover:text-on-surface">
+          <Link href="/projects" className="self-start font-label-md text-label-md text-on-surface-variant hover:text-on-surface sm:self-auto">
             ← Projects
           </Link>
         </div>
@@ -253,7 +253,7 @@ function ProjectDetailContent() {
                   <option value="critical">Critical</option>
                 </select>
               </label>
-              <button type="submit" disabled={isSubmitting || (priority === project.priority && maturity === project.maturity)} className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-on-primary disabled:opacity-50">
+              <button type="submit" disabled={isSubmitting || (priority === project.priority && maturity === project.maturity)} className="w-full rounded-lg bg-primary px-4 py-2 text-sm font-medium text-on-primary disabled:opacity-50 sm:w-auto">
                 {isSubmitting ? "Saving..." : "Save changes"}
               </button>
             </form>
@@ -284,13 +284,13 @@ function ProjectDetailContent() {
             )}
           </div>
           {canManageTeams && (
-            <form onSubmit={handleAddTeam} className="flex gap-2">
+            <form onSubmit={handleAddTeam} className="flex flex-col gap-2 sm:flex-row">
               <label htmlFor="project-team" className="sr-only">Assign team to project</label>
               <select id="project-team" value={teamId} onChange={(e) => setTeamId(e.target.value)} className="flex-1 rounded-lg border border-outline-variant px-3 py-2 text-sm focus:border-secondary focus:outline-none">
                 <option value="">Assign a team...</option>
                 {availableTeams.map((team) => <option key={team.id} value={team.id}>{team.name}</option>)}
               </select>
-              <button type="submit" disabled={isSubmitting || !teamId} className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-on-primary hover:bg-primary-container disabled:opacity-50">Assign</button>
+              <button type="submit" disabled={isSubmitting || !teamId} className="w-full rounded-lg bg-primary px-4 py-2 text-sm font-medium text-on-primary hover:bg-primary-container disabled:opacity-50 sm:w-auto">Assign</button>
             </form>
           )}
         </section>

@@ -122,8 +122,8 @@ function RosterContent() {
 
   return (
     <AppShell active="team" breadcrumb={roster.team.name}>
-      <div className="px-gutter-lg py-space-lg max-w-4xl">
-        <div className="mb-6 flex items-center justify-between">
+      <div className="px-4 sm:px-gutter-lg py-space-lg max-w-4xl">
+        <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h1 className="font-headline-xl text-headline-xl text-on-surface font-bold tracking-tight">
               {roster.team.name}

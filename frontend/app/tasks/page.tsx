@@ -221,7 +221,7 @@ function TasksContent() {
     const projectNames = new Map(projects.map((project) => [project.id, project.name]));
     return (
         <AppShell active="tasks" breadcrumb="Tasks">
-            <div className="px-gutter-lg py-space-lg">
+            <div className="px-4 sm:px-gutter-lg py-space-lg">
                 <div className="mb-6 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
                     <div>
                         <h1 className="font-headline-xl text-headline-xl font-bold text-on-surface">
@@ -234,18 +234,18 @@ function TasksContent() {
                             <p className="mt-1 text-sm text-on-surface-variant">You can update the status of tasks assigned to you.</p>
                         )}
                     </div>
-                    <div className="flex flex-wrap gap-2">
+                    <div className="flex w-full flex-wrap gap-2 sm:w-auto">
                         <input
                             value={search}
                             onChange={(event) => setSearch(event.target.value)}
                             placeholder="Search tasks"
-                            className="rounded-lg border border-outline-variant bg-surface-container-lowest px-3 py-2 text-sm"
+                            className="w-full min-w-0 rounded-lg border border-outline-variant bg-surface-container-lowest px-3 py-2 text-sm sm:w-auto"
                         />
                         <select
                             aria-label="Filter tasks by project"
                             value={filterProjectId}
                             onChange={(event) => setFilterProjectId(event.target.value)}
-                            className="min-w-44 rounded-lg border border-outline-variant bg-surface-container-lowest px-3 py-2 text-sm"
+                            className="w-full min-w-0 rounded-lg border border-outline-variant bg-surface-container-lowest px-3 py-2 text-sm sm:w-auto sm:min-w-44"
                         >
                             <option value="">{projectFilterLabel}</option>
                             {projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}
@@ -255,7 +255,7 @@ function TasksContent() {
                                 aria-label="Filter tasks by assignee"
                                 value={filterAssigneeId}
                                 onChange={(event) => setFilterAssigneeId(event.target.value)}
-                                className="min-w-44 rounded-lg border border-outline-variant bg-surface-container-lowest px-3 py-2 text-sm"
+                                className="w-full min-w-0 rounded-lg border border-outline-variant bg-surface-container-lowest px-3 py-2 text-sm sm:w-auto sm:min-w-44"
                             >
                                 <option value="">All users</option>
                                 {taskAssignees.map((assignee) => <option key={assignee.id} value={assignee.id}>{assignee.full_name || assignee.email}</option>)}
@@ -264,7 +264,7 @@ function TasksContent() {
                         {canCreateTasks && (
                             <button
                                 onClick={() => setShowForm((value) => !value)}
-                                className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-on-primary"
+                                className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-on-primary sm:w-auto"
                             >
                                 <Plus size={16} />
                                 New task
@@ -289,7 +289,7 @@ function TasksContent() {
                                 setProjectId(event.target.value);
                                 setAssigneeId("");
                             }}
-                            className="min-w-48 rounded-lg border border-outline-variant px-3 py-2 text-sm"
+                            className="w-full min-w-0 rounded-lg border border-outline-variant px-3 py-2 text-sm sm:w-auto sm:min-w-48"
                         >
                             <option value="">Select project...</option>
                             {projects.map((project) => (
@@ -302,14 +302,14 @@ function TasksContent() {
                             value={title}
                             onChange={(event) => setTitle(event.target.value)}
                             placeholder="Task title"
-                            className="min-w-64 flex-1 rounded-lg border border-outline-variant px-3 py-2 text-sm"
+                            className="w-full min-w-0 flex-1 rounded-lg border border-outline-variant px-3 py-2 text-sm sm:min-w-64"
                         />
                         <select
                             value={priority}
                             onChange={(event) =>
                                 setPriority(event.target.value as TaskPriority)
                             }
-                            className="rounded-lg border border-outline-variant px-3 py-2 text-sm"
+                            className="w-full rounded-lg border border-outline-variant px-3 py-2 text-sm sm:w-auto"
                         >
                             <option value="low">Low priority</option>
                             <option value="medium">Medium priority</option>
@@ -320,7 +320,7 @@ function TasksContent() {
                             value={assigneeId}
                             onChange={(event) => setAssigneeId(event.target.value)}
                             disabled={!projectId}
-                            className="min-w-48 rounded-lg border border-outline-variant px-3 py-2 text-sm disabled:opacity-50"
+                            className="w-full min-w-0 rounded-lg border border-outline-variant px-3 py-2 text-sm disabled:opacity-50 sm:w-auto sm:min-w-48"
                         >
                             <option value="">Unassigned</option>
                             {canAssignTasks && (projectMembers[projectId] || []).map((member) => (
@@ -429,8 +429,8 @@ function TasksContent() {
                                                     {task.description}
                                                 </p>
                                             )}
-                                            <div className="mt-4 flex items-center justify-between text-xs text-outline">
-                                                <span>{task.project_id ? projectNames.get(task.project_id) : ""}</span>
+                                            <div className="mt-4 flex flex-wrap items-center justify-between gap-2 text-xs text-outline">
+                                                <span className="max-w-full truncate">{task.project_id ? projectNames.get(task.project_id) : ""}</span>
                                                 {task.assignee ? (
                                                     <span className="inline-flex items-center gap-1">
                                                         <UserRound size={14} />

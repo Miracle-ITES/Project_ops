@@ -180,7 +180,7 @@ function IssuesContent() {
   }
 
   return <AppShell active="issues" breadcrumb="Issues">
-    <div className="max-w-7xl px-gutter-lg py-space-lg">
+    <div className="max-w-7xl px-4 sm:px-gutter-lg py-space-lg">
       <div className="mb-6">
         <h1 className="font-headline-xl text-headline-xl font-bold text-on-surface">Issues</h1>
         <p className="mt-1 text-on-surface-variant">Report project issues and follow their status.</p>
@@ -268,7 +268,7 @@ function IssuesContent() {
             </div>}
           </div>
         </article>)}
-      {pageCount > 1 && <div className="mt-5 flex items-center justify-between gap-3 text-sm text-on-surface-variant">
+      {pageCount > 1 && <div className="mt-5 flex flex-wrap items-center justify-between gap-3 text-sm text-on-surface-variant">
         <span>{issueTotal} issues · Page {page} of {pageCount}</span>
         <div className="flex gap-2">
           <button type="button" disabled={page <= 1} onClick={() => setPage((current) => Math.max(1, current - 1))} className="rounded-lg border border-outline-variant px-3 py-1.5 disabled:opacity-50">Previous</button>

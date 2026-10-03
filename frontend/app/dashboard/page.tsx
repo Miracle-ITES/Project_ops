@@ -56,7 +56,7 @@ function DashboardContent() {
 
   return (
     <AppShell active="dashboard" breadcrumb="Executive Overview">
-      <div className="px-gutter-lg py-space-lg">
+      <div className="px-4 sm:px-gutter-lg py-space-lg">
         {loadError && <p role="alert" className="mb-4 rounded-lg bg-error-container px-3 py-2 text-sm text-on-error-container">{loadError}</p>}
         {/* Header row */}
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-space-md mb-space-lg">

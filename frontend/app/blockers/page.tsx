@@ -144,7 +144,7 @@ function BlockersContent() {
 
     return (
         <AppShell active="blockers" breadcrumb="Tickets">
-            <div className="max-w-5xl px-gutter-lg py-space-lg">
+            <div className="max-w-5xl px-4 sm:px-gutter-lg py-space-lg">
                 <div className="mb-6">
                     <h1 className="font-headline-xl text-headline-xl font-bold text-on-surface">Raise Ticket</h1>
                     <p className="mt-1 font-body-md text-body-md text-on-surface-variant">Raise obstacles against projects and track their resolution.</p>
@@ -184,7 +184,7 @@ function BlockersContent() {
                                     <p className="mt-3 text-xs text-outline">Raised by {blocker.raised_by_email} on {new Date(blocker.created_at).toLocaleString()}</p>
                                     <p className="mt-2 text-xs text-outline">Assigned to {blocker.assignee_email || "Unassigned"}</p>
                                 </div>
-                                <div className="flex gap-2">
+                                <div className="flex flex-wrap gap-2">
                                     {canReassign && <button type="button" onClick={() => void openAssignment(blocker)} className="rounded-lg border border-outline-variant px-3 py-1.5 text-sm text-on-surface hover:border-secondary hover:text-secondary">Assign</button>}
                                     {blocker.status === "open" && hasPermission("blockers:manage") && <button type="button" onClick={() => void resolveBlocker(blocker.id)} className="rounded-lg border border-outline-variant px-3 py-1.5 text-sm text-on-surface hover:border-secondary hover:text-secondary">Mark resolved</button>}
                                 </div>
