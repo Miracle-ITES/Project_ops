@@ -22,6 +22,16 @@ class TeamService:
             raise TeamError(f"A team named '{name}' already exists")
         return self.teams.create(name=name, description=description)
 
+    def update_team_name(self, team_id: uuid.UUID, name: str) -> Team:
+        team = self.get_team(team_id)
+        existing = self.teams.get_by_name(name)
+        if existing is not None and existing.id != team_id:
+            raise TeamError(f"A team named '{name}' already exists")
+        return self.teams.update_name(team, name)
+
+    def delete_team(self, team_id: uuid.UUID) -> None:
+        self.teams.delete(self.get_team(team_id))
+
     def list_teams(self) -> list[Team]:
         return self.teams.list_all()
 

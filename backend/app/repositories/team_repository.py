@@ -17,6 +17,16 @@ class TeamRepository(BaseRepository):
         self.db.refresh(team)
         return team
 
+    def update_name(self, team: Team, name: str) -> Team:
+        team.name = name
+        self.db.commit()
+        self.db.refresh(team)
+        return team
+
+    def delete(self, team: Team) -> None:
+        self.db.delete(team)
+        self.db.commit()
+
     def get_by_id(self, team_id: uuid.UUID) -> Team | None:
         return self.db.query(Team).filter(Team.id == team_id).first()
 

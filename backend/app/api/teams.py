@@ -3,7 +3,7 @@ import uuid
 from fastapi import APIRouter, Depends, HTTPException, status
 
 from app.api.deps import get_team_service, require_any_permission, require_permission
-from app.api.schemas.teams import MyTeamMemberOut, RosterMemberOut, TeamCreateRequest, TeamMemberAddRequest, TeamMembershipHistoryOut, TeamOut, TeamRosterOut
+from app.api.schemas.teams import MyTeamMemberOut, RosterMemberOut, TeamCreateRequest, TeamMemberAddRequest, TeamMembershipHistoryOut, TeamOut, TeamRosterOut, TeamUpdateRequest
 from app.domain.user import User
 from app.services.team_service import TeamError, TeamService
 
@@ -20,6 +20,36 @@ def create_team(
         return team_service.create_team(name=payload.name, description=payload.description)
     except TeamError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=exc.message)
+
+
+@router.patch("/{team_id}", response_model=TeamOut)
+def update_team(
+    team_id: uuid.UUID,
+    payload: TeamUpdateRequest,
+    team_service: TeamService = Depends(get_team_service),
+    _: User = Depends(require_permission("users:manage", revalidate_from_db=True)),
+):
+    try:
+        name = payload.name.strip()
+        if not name:
+            raise TeamError("Team name cannot be empty")
+        return team_service.update_team_name(team_id, name)
+    except TeamError as exc:
+        code = status.HTTP_404_NOT_FOUND if exc.message == "Team not found" else status.HTTP_400_BAD_REQUEST
+        raise HTTPException(status_code=code, detail=exc.message)
+
+
+@router.delete("/{team_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_team(
+    team_id: uuid.UUID,
+    team_service: TeamService = Depends(get_team_service),
+    _: User = Depends(require_permission("users:manage", revalidate_from_db=True)),
+):
+    try:
+        team_service.delete_team(team_id)
+    except TeamError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=exc.message)
+    return None
 
 
 @router.get("", response_model=list[TeamOut])

@@ -24,6 +24,18 @@ export function createTeam(payload: {
   });
 }
 
+export function updateTeamName(teamId: string, name: string): Promise<TeamOut> {
+  return authedFetch<TeamOut>(`/teams/${teamId}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name }),
+  });
+}
+
+export function deleteTeam(teamId: string): Promise<void> {
+  return authedFetch<void>(`/teams/${teamId}`, { method: "DELETE" });
+}
+
 export function getRoster(teamId: string): Promise<TeamRosterOut> {
   return authedFetch<TeamRosterOut>(`/teams/${teamId}/roster`);
 }
