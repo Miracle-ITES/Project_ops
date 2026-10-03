@@ -94,12 +94,12 @@ function DashboardContent() {
             </span>
             <div className="mt-3 font-display-lg text-display-lg font-bold text-on-surface tracking-tight">{isLoading ? "…" : metrics?.tasks_due_today ?? 0}</div>
           </div>
-          <Link href="/blockers" aria-label={`Open tickets: ${isLoading ? "loading" : metrics?.open_tickets ?? 0}. View tickets`} className="rounded-xl bg-surface-container-lowest p-4 shadow-sm transition hover:shadow-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-secondary">
+          <div className="p-4 rounded-xl bg-surface-container-lowest shadow-sm">
             <span className="font-label-sm text-label-sm uppercase tracking-wider font-semibold text-outline">
               Open Tickets
             </span>
             <div className="mt-3 font-display-lg text-display-lg font-bold text-error tracking-tight">{isLoading ? "…" : metrics?.open_tickets ?? 0}</div>
-          </Link>
+          </div>
           {!isMember && <div className="p-4 rounded-xl bg-surface-container-lowest shadow-sm">
             <span className="font-label-sm text-label-sm uppercase tracking-wider font-semibold text-outline">
               Team Progress
@@ -220,10 +220,10 @@ function DashboardContent() {
                 <h2 className="font-headline-md text-headline-md font-bold text-on-surface">Active Tickets</h2>
               </div>
               <div className="space-y-space-sm mt-1">
-                <div className="p-3 rounded-lg bg-error-container/40">
+                <Link href="/blockers" aria-label={`View active tickets: ${metrics?.open_tickets ?? 0} tickets need attention`} className="block rounded-lg bg-error-container/40 p-3 transition hover:bg-error-container/70 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-error">
                   <p className="text-sm font-medium text-on-error-container">{metrics?.open_tickets ?? 0} tickets need attention</p>
                   <p className="mt-1 text-xs text-on-error-container/80">Live from the ticket register</p>
-                </div>
+                </Link>
               </div>
             </div>
           </div>
