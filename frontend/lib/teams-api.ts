@@ -36,11 +36,11 @@ export function listMyTeamMembers(): Promise<MyTeamMemberOut[]> {
   return authedFetch<MyTeamMemberOut[]>("/teams/mine/members");
 }
 
-export function addMember(teamId: string, userId: string, endDate: string): Promise<TeamOut> {
+export function addMember(teamId: string, userId: string, endDate?: string): Promise<TeamOut> {
   return authedFetch<TeamOut>(`/teams/${teamId}/members`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ user_id: userId, end_date: endDate }),
+    body: JSON.stringify({ user_id: userId, end_date: endDate || null }),
   });
 }
 
